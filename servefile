@@ -1,0 +1,129 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+# written by seba (seba-geek.de) :)
+# v0.3
+
+import BaseHTTPServer
+import sys
+import os
+import urllib
+from stat import ST_SIZE
+import SocketServer
+import socket
+import commands
+
+class FileHandler(BaseHTTPServer.BaseHTTPRequestHandler):
+	fileName = "Undefined"
+	filePath = "/dev/null"
+	fileLength = 0
+	blockSize = 1024 * 1024
+	
+	def do_GET(self):
+		if urllib.unquote(self.path) != "/" + self.fileName:
+			self.send_response(302)
+			self.send_header('Location', '/' + self.fileName)
+			self.end_headers()
+			return
+
+		myfile = open(self.filePath, 'rb')
+		
+		# find out if this is a continuing download
+		fromto = None
+		cont =  self.headers.get("Range")
+		if cont != None:
+			cont = cont.split("=")
+			if len(cont) > 1 and cont[0] == 'bytes':
+				fromto = cont[1].split('-')
+				if len(fromto) > 1:
+					if fromto[1] == '':
+						fromto[1] = self.fileLength-1
+					fromto[0] = int(fromto[0])
+					fromto[1] = int(fromto[1])
+					if fromto[0] >= self.fileLength or fromto[0] < 0 or fromto[1] >= self.fileLength or fromto[1]-fromto[0] < 0:
+						# oops, already done!
+						self.send_response(416)
+						self.send_header('Content-Range', 'bytes */%s' % self.fileLength)
+						self.end_headers()
+						return
+					# now we can wind the file *brrrrrr*
+					myfile.seek(fromto[0])
+		
+		if fromto != None:
+			self.send_response(216)
+			self.send_header('Content-Range', 'bytes %s-%s/%s' % (fromto[0], fromto[1], self.fileLength))
+			self.send_header('Content-Length', fromto[1]-fromto[0]+1)
+		else:
+			self.send_response(200)
+			self.send_header('Content-Length', self.fileLength)
+		self.send_header('Content-Disposition', 'attachment; filename="%s"' % self.fileName)
+		self.send_header('Content-type', 'application/octet-stream')
+		self.send_header('Content-Transfer-Encoding', ' binary')
+		self.end_headers()
+		block = self.getChunk(myfile, fromto)
+		while block:
+			try:
+				self.wfile.write(block)
+			except socket.error, e:
+				print "%s ABORTED transmission (Reason %s: %s)" % (self.client_address[0], e[0], e[1])
+				return
+			block = self.getChunk(myfile, fromto)
+		myfile.close()
+		print "%s finished downloading" % (self.client_address[0])
+		return
+	
+	def getChunk(self, myfile, fromto):
+		if fromto != None and myfile.tell()+self.blockSize >= fromto[1]:
+			readsize = fromto[1]-myfile.tell()+1
+		else:
+			readsize = self.blockSize
+		return myfile.read(readsize)
+
+class ThreadedHTTPServer(SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer):
+	pass
+
+def main():
+	if len(sys.argv) < 2 or len(sys.argv) > 3 or sys.argv[1] in ('-h', '--help'):
+		print "Usage: [path to file] <port=8080>"
+		return
+	
+	port = 8080
+	if len(sys.argv) == 3:
+		try:
+			port = int(sys.argv[2])
+		except ValueError:
+			print "Error: Port should be an int!"
+			return
+	
+	try:
+		testit = open(sys.argv[1], 'r')
+		testit.close()
+		FileHandler.filePath = sys.argv[1]
+		FileHandler.fileName = os.path.basename(sys.argv[1])
+		FileHandler.fileLength = os.stat(sys.argv[1])[ST_SIZE]
+	except IOError:
+		print "Error: Could not open file!"
+		return
+	
+	server = ThreadedHTTPServer(('', port), FileHandler)
+	print "Serving:", sys.argv[1]
+	print "Port: ", port
+	print "Ready..."
+	server.address_family = 10
+	# print urls with local network adresses
+	print "Some addresses this file will be available under:"
+	ips = commands.getoutput(r"/sbin/ifconfig |grep 'inet6\?'|grep -v 127.0.0.1|grep -v ' fe80'|grep -v ::1|sed -n 's/.*inet6\?[a-zA-Z: -]\+\([0-9a-fA-F.:]*\).*/\1/p'")
+	for ip in ips.split("\n"):
+		if ip.find(":") >= 0:
+			ip = "[%s]" % ip # must be v6...
+			continue	# FIXME: When BaseHTTP supports ipv6 properly, delete this line
+		print "http://%s:%d" % (ip, port)
+	
+	try:
+		server.serve_forever()
+	except KeyboardInterrupt:
+		server.socket.close()
+	print "Good bye.."
+
+if __name__ == '__main__':
+	main()
