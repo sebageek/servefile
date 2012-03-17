@@ -30,9 +30,8 @@ class FileHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 		
 		# find out if this is a continuing download
 		fromto = None
-		cont =  self.headers.get("Range")
-		if cont != None:
-			cont = cont.split("=")
+		if "Range" in self.headers:
+			cont = self.headers.get("Range").split("=")
 			if len(cont) > 1 and cont[0] == 'bytes':
 				fromto = cont[1].split('-')
 				if len(fromto) > 1:
@@ -73,7 +72,7 @@ class FileHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 		return
 	
 	def getChunk(self, myfile, fromto):
-		if fromto != None and myfile.tell()+self.blockSize >= fromto[1]:
+		if fromto and myfile.tell()+self.blockSize >= fromto[1]:
 			readsize = fromto[1]-myfile.tell()+1
 		else:
 			readsize = self.blockSize
@@ -115,9 +114,11 @@ def main():
 	ips = commands.getoutput(r"/sbin/ifconfig |grep 'inet6\?'|grep -v 127.0.0.1|grep -v ' fe80'|grep -v ::1|sed -n 's/.*inet6\?[a-zA-Z: -]\+\([0-9a-fA-F.:]*\).*/\1/p'")
 	for ip in ips.split("\n"):
 		if ip.find(":") >= 0:
-			ip = "[%s]" % ip # must be v6...
-			continue	# FIXME: When BaseHTTP supports ipv6 properly, delete this line
-		print "http://%s:%d" % (ip, port)
+			# ipv6
+			ip = "[%s]" % ip
+			# FIXME: When BaseHTTP supports ipv6 properly, delete this line
+			continue	
+		print "http://%s:%d/" % (ip, port)
 	
 	try:
 		server.serve_forever()
