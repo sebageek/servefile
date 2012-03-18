@@ -4,6 +4,7 @@
 # written by seba (seba-geek.de) :)
 # v0.3
 
+import argparse
 import BaseHTTPServer
 import commands
 import urllib
@@ -82,44 +83,40 @@ class ThreadedHTTPServer(SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer)
 	pass
 
 def main():
-	if len(sys.argv) < 2 or len(sys.argv) > 3 or sys.argv[1] in ('-h', '--help'):
-		print "Usage: [path to file] <port=8080>"
-		return
+	parser = argparse.ArgumentParser()
+	parser.add_argument('filename', metavar='file/directory', type=str)
+	parser.add_argument('-p', '--port', type=int, default=8080, \
+	                    help='port to listen on')
 	
-	port = 8080
-	if len(sys.argv) == 3:
-		try:
-			port = int(sys.argv[2])
-		except ValueError:
-			print "Error: Port should be an int!"
-			return
-	
+	args = parser.parse_args()
+		
 	try:
-		testit = open(sys.argv[1], 'r')
+		testit = open(args.filename, 'r')
 		testit.close()
 		FileHandler.filePath = sys.argv[1]
-		FileHandler.fileName = os.path.basename(sys.argv[1])
-		FileHandler.fileLength = os.stat(sys.argv[1])[ST_SIZE]
+		FileHandler.fileName = os.path.basename(args.filename)
+		FileHandler.fileLength = os.stat(args.filename)[ST_SIZE]
 	except IOError:
 		print "Error: Could not open file!"
-		return
-	
-	server = ThreadedHTTPServer(('', port), FileHandler)
-	print "Serving:", sys.argv[1]
-	print "Port: ", port
-	print "Ready..."
-	server.address_family = 10
+		sys.exit(3)
+
+	server = ThreadedHTTPServer(('', args.port), FileHandler)
+	print "Serving \"%s\" under port %d" % (args.filename, args.port)
+
 	# print urls with local network adresses
-	print "Some addresses this file will be available under:"
-	ips = commands.getoutput(r"/bin/ip addr|sed -n -e 's/.*inet6\? \([0-9.a-fA-F:]\+\)\/.*/\1/ p'|grep -v '^fe80\|^127.0.0.1\|^::1'")
+	print "\nSome addresses this file will be available under:"
+
+	ips = commands.getoutput(r"/bin/ip addr|" + \
+	                  "sed -n -e 's/.*inet6\? \([0-9.a-fA-F:]\+\)\/.*/\\1/ p'|" + \
+					  "grep -v '^fe80\|^127.0.0.1\|^::1'")
 	for ip in ips.split("\n"):
 		if ip.find(":") >= 0:
 			# ipv6
 			ip = "[%s]" % ip
 			# FIXME: When BaseHTTP supports ipv6 properly, delete this line
 			continue	
-		print "http://%s:%d/" % (ip, port)
-	
+		print "http://%s:%d/" % (ip, args.port)
+
 	try:
 		server.serve_forever()
 	except KeyboardInterrupt:
