@@ -14,6 +14,7 @@ import os
 import SocketServer
 import socket
 from stat import ST_SIZE
+from subprocess import Popen, PIPE
 import sys
 
 class FileHandler(BaseHTTPServer.BaseHTTPRequestHandler):
@@ -108,16 +109,36 @@ def main():
 	# print urls with local network adresses
 	print "\nSome addresses this file will be available under:"
 
-	ips = commands.getoutput(r"/bin/ip addr|" + \
-	                  "sed -n -e 's/.*inet6\? \([0-9.a-fA-F:]\+\)\/.*/\\1/ p'|" + \
-					  "grep -v '^fe80\|^127.0.0.1\|^::1'")
-	for ip in ips.split("\n"):
-		if ip.find(":") >= 0:
-			# ipv6
-			ip = "[%s]" % ip
-			# FIXME: When BaseHTTP supports ipv6 properly, delete this line
-			continue	
-		print "http://%s:%d/" % (ip, args.port)
+	# ip and ifconfig sometimes are located in /sbin/
+	os.environ['PATH'] += ':/sbin:/usr/sbin'
+	proc = Popen(r"ip addr|" + \
+	              "sed -n -e 's/.*inet6\? \([0-9.a-fA-F:]\+\)\/.*/\\1/ p'|" + \
+	              "grep -v '^fe80\|^127.0.0.1\|^::1'", shell=True, stdout=PIPE)
+	if proc.wait() != 0:
+		# ip failed somehow, falling back to ifconfig
+		oldLang = os.environ.get("LC_ALL", None)
+		os.environ['LC_ALL'] = "C"
+		proc = Popen(r"ifconfig|" + \
+		              "sed -n 's/.*inet6\? addr: \?\([0-9a-fA-F.:]*\).*/" + \
+					  "\\1/p'|" + \
+					  "grep -v '^fe80\|^127.0.0.1\|^::1'", \
+					  shell=True, stdout=PIPE, stderr=PIPE)
+		if oldLang:
+			os.environ['LC_ALL'] = oldLang
+		else:
+			del(os.environ['LC_ALL'])
+		if proc.wait() != 0:
+			print "Error: Could not locate any ips for you."
+			proc = None
+	if proc:
+		ips = proc.stdout.read().strip()
+		for ip in ips.split("\n"):
+			if ip.find(":") >= 0:
+				# ipv6
+				ip = "[%s]" % ip
+				# FIXME: When BaseHTTP supports ipv6 properly, delete this line
+				continue	
+			print "http://%s:%d/" % (ip, args.port)
 
 	try:
 		server.serve_forever()
