@@ -1,8 +1,10 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# written by seba (seba-geek.de) :)
-# v0.3
+# Licensed under GNU General Public License v3 or later
+# Written by Sebastian Lohff (seba@seba-geek.de)
+# http://seba-geek.de/stuff/servefile/
+# v0.3.1
 
 import argparse
 import BaseHTTPServer
