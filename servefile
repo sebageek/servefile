@@ -4,7 +4,8 @@
 # Licensed under GNU General Public License v3 or later
 # Written by Sebastian Lohff (seba@seba-geek.de)
 # http://seba-geek.de/stuff/servefile/
-# v0.3.1
+
+__version__ = '0.3.1'
 
 import argparse
 import BaseHTTPServer
@@ -87,6 +88,7 @@ class ThreadedHTTPServer(SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer)
 
 def main():
 	parser = argparse.ArgumentParser()
+	parser.add_argument('--version', action='version', version='%(prog)s ' + __version__)
 	parser.add_argument('filename', metavar='file/directory', type=str)
 	parser.add_argument('-p', '--port', type=int, default=8080, \
 	                    help='port to listen on')
