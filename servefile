@@ -5,13 +5,13 @@
 # v0.3
 
 import BaseHTTPServer
-import sys
-import os
+import commands
 import urllib
-from stat import ST_SIZE
+import os
 import SocketServer
 import socket
-import commands
+from stat import ST_SIZE
+import sys
 
 class FileHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 	fileName = "Undefined"
