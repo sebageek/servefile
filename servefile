@@ -5,7 +5,7 @@
 # Written by Sebastian Lohff (seba@seba-geek.de)
 # http://seba-geek.de/stuff/servefile/
 
-__version__ = '0.3.1'
+__version__ = '0.3.2'
 
 import argparse
 import BaseHTTPServer
