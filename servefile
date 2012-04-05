@@ -86,12 +86,28 @@ class FileHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 class ThreadedHTTPServer(SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer):
 	pass
 
+class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
+	def do_GET(self):
+		self.send_response(200)
+		self.end_headers()
+		self.wfile.write("HAI")
+
+	def do_POST(self):
+		self.send_response(200)
+		self.end_headers()
+		self.wfile.write("oha.")
+
+class ThreadedPutServer(SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer):
+	pass
+
 def main():
 	parser = argparse.ArgumentParser(description='Serve a single file via HTTP')
 	parser.add_argument('--version', action='version', version='%(prog)s ' + __version__)
 	parser.add_argument('filename', metavar='file/directory', type=str)
 	parser.add_argument('-p', '--port', type=int, default=8080, \
 	                    help='port to listen on')
+	parser.add_argument('-u', '--upload', action="store_true", default=False, \
+	                    help="Enable uploads to a given directory")
 	
 	args = parser.parse_args()
 		
@@ -150,3 +166,4 @@ def main():
 
 if __name__ == '__main__':
 	main()
+
