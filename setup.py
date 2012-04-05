@@ -4,10 +4,10 @@ from distutils.core import setup
 
 setup(
 	name='servefile',
-	description='Script to serve files via a small HTTP server',
-	long_description='Script to serve files via a small HTTP server. The server redirects all http requests to the file, so only IP and port must be given to another user to access the file.',
+	description='Serve files from shell via a small HTTP server',
+	long_description='Serve files from shell via a small HTTP server. The server redirects all HTTP requests to the file, so only IP and port must be given to another user to access the file. Its main purpose is to quickly send a file to users in your local network, independent of their current setup (OS/software).',
 	platforms='posix',
-	version='0.3.1',
+	version='0.3.2',
 	license='GPLv3 or later',
 	url='http://seba-geek.de/stuff/servefile/',
 	author='Sebastian Lohff',
