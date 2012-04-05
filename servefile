@@ -98,7 +98,7 @@ def main():
 	try:
 		testit = open(args.filename, 'r')
 		testit.close()
-		FileHandler.filePath = sys.argv[1]
+		FileHandler.filePath = args.filename
 		FileHandler.fileName = os.path.basename(args.filename)
 		FileHandler.fileLength = os.stat(args.filename)[ST_SIZE]
 	except IOError:
