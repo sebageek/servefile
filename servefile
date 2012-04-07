@@ -106,13 +106,17 @@ class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
 		env = os.environ
 		env['REQUEST_METHOD'] = "POST"
 		ctype = self.headers.getheader('content-type')
-		fstorage = cgi.FieldStorage(fp=self.rfile, headers=self.headers, environ=env)
 		if not (ctype and ctype.lower().startswith("multipart/form-data")):
+			# not a normal multipart request ==> handle as PUT request
+			self.do_PUT()
+			return
 			self.sendResponse(400, "Request was not a multipart request. If you want to upload data with curl, do a PUT request, e.g. curl -X PUT -d @file http://ip:port/your-filename")
+			return
 
 		if not "file" in fstorage:
 			self.sendResponse(400, "No file found in request.")
 			return
+		fstorage = cgi.FieldStorage(fp=self.rfile, headers=self.headers, environ=env)
 		destFileName = self.getTargetName(fstorage["file"].filename)
 		if destFileName == "":
 			self.sendResponse(400, "Filename was empty")
@@ -123,7 +127,6 @@ class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
 		self.sendResponse(200, "OK!")
 
 	def do_PUT(self):
-		print self.headers
 		length = 0
 		try:
 			length = int(self.headers['Content-Length'])
@@ -143,7 +146,7 @@ class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
 		if self.headers.getheader("Expect") == "100-continue":
 			self.send_response(100)
 			self.end_headers()
-		print "Saving uploaded file to %s" % fileName
+		print "Saving uploaded file to %s" % cleanFileName
 		target = open(cleanFileName, "w")
 		target.write(self.rfile.read(int(self.headers['Content-Length'])))
 		target.close()
@@ -188,7 +191,6 @@ def main():
 
 	handler = None
 	dirCreated = False
-	print args.upload
 	if not args.upload:
 		try:
 			testit = open(args.filename, 'r')
