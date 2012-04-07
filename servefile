@@ -189,10 +189,13 @@ def main():
 		handler = FilePutter
 	
 	server = ThreadedHTTPServer(('', args.port), handler)
-	print "Serving \"%s\" under port %d" % (args.filename, args.port)
+	if args.upload:
+		print "Serving \"%s\" under port %d" % (args.filename, args.port)
+	else:
+		print "Serving \"%s\" for uploads under port %d" % (args.filename, args.port)
 
 	# print urls with local network adresses
-	print "\nSome addresses this file will be available under:"
+	print "\nSome addresses this will be available under:"
 
 	# ip and ifconfig sometimes are located in /sbin/
 	os.environ['PATH'] += ':/sbin:/usr/sbin'
@@ -229,8 +232,12 @@ def main():
 		server.serve_forever()
 	except KeyboardInterrupt:
 		server.socket.close()
+
+	# cleanup potential upload directory
+	if dirCreated and len(os.listdir(args.filename)) == 0:
+		# created upload dir was not used
+		os.rmdir(args.filename)
 	print "Good bye.."
-	# XXX: cleanup upload directory
 
 if __name__ == '__main__':
 	main()
