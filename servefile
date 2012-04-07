@@ -112,10 +112,8 @@ class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
 		if not "file" in fstorage:
 			self.sendResponse(400, "No file found in request.")
 			return
-		print dir(fstorage["file"])
-		print fstorage["file"].filename, 
-		cleanFileName = self.cleanFileName(fstorage["file"].filename)
-		if cleanFileName == "":
+		destFileName = self.getTargetName(fstorage["file"].filename)
+		if destFileName == "":
 			self.sendResponse(400, "Filename was empty")
 			return
 		destFileName = self.targetDir + "/" + cleanFileName
@@ -140,9 +138,21 @@ class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
 		self.end_headers()
 		self.wfile.write(msg)
 	
-	def cleanFileName(self, fname):
-		return fname.replace("/", "")
-
+	def getTargetName(self, fname):
+		cleanFileName = fname.replace("/", "")
+		if cleanFileName == "":
+			return ""
+		destFileName = self.targetDir + "/" + cleanFileName
+		if not os.path.exists(destFileName):
+			return destFileName
+		else:
+			i = 1
+			extraDestFileName = destFileName + "(%s)" % i
+			while os.path.exists(extraDestFileName):
+				i += 1
+				extraDestFileName = destFileName + "(%s)" % i
+			return extraDestFileName
+		# never reached
 
 class ThreadedHTTPServer(SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer):
 	pass
