@@ -8,6 +8,7 @@
 __version__ = '0.3.2'
 
 import argparse
+import cgi
 import BaseHTTPServer
 import commands
 import urllib
@@ -83,21 +84,67 @@ class FileHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 			readsize = self.blockSize
 		return myfile.read(readsize)
 
-class ThreadedHTTPServer(SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer):
-	pass
-
 class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
+	targetDir = "unknown"
+	uploadPage = """
+<!docype html>
+<html>
+	<form action="/" method="post" enctype="multipart/form-data">
+		<label for="file">Filename:</label>
+		<input type="file" name="file" id="file" />
+		<br />
+		<input type="submit" name="submit" value="Upload" />
+	</form>
+</html>
+"""
+
 	def do_GET(self):
-		self.send_response(200)
-		self.end_headers()
-		self.wfile.write("HAI")
+		self.sendResponse(200, self.uploadPage)
 
 	def do_POST(self):
-		self.send_response(200)
-		self.end_headers()
-		self.wfile.write("oha.")
+		env = os.environ
+		env['REQUEST_METHOD'] = "POST"
+		ctype = self.headers.getheader('content-type')
+		fstorage = cgi.FieldStorage(fp=self.rfile, headers=self.headers, environ=env)
+		if not (ctype and ctype.lower().startswith("multipart/form-data")):
+			self.sendResponse(400, "Request was not a multipart request. If you want to upload data with curl, do a PUT request, e.g. curl -X PUT -d @file http://ip:port/your-filename")
 
-class ThreadedPutServer(SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer):
+		if not "file" in fstorage:
+			self.sendResponse(400, "No file found in request.")
+			return
+		print dir(fstorage["file"])
+		print fstorage["file"].filename, 
+		cleanFileName = self.cleanFileName(fstorage["file"].filename)
+		if cleanFileName == "":
+			self.sendResponse(400, "Filename was empty")
+			return
+		destFileName = self.targetDir + "/" + cleanFileName
+		if os.path.exists(destFileName):
+			i = 1
+			extraDestFileName = destFileName + "(%s)" % i
+			while os.path.exists(extraDestFileName):
+				i += 1
+				extraDestFileName = destFileName + "(%s)" % i
+			destFileName = extraDestFileName
+		print fstorage["file"].file
+		target = open(destFileName, "w")
+		target.write(fstorage["file"].file.read())
+		target.close()
+		msg = "OK!"
+		self.sendResponse(200, "OK!")
+
+	def sendResponse(self, code, msg):
+		self.send_response(code)
+		self.send_header('Content-Type', 'text/html')
+		self.send_header('content-Length', str(len(msg)))
+		self.end_headers()
+		self.wfile.write(msg)
+	
+	def cleanFileName(self, fname):
+		return fname.replace("/", "")
+
+
+class ThreadedHTTPServer(SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer):
 	pass
 
 def main():
@@ -110,18 +157,38 @@ def main():
 	                    help="Enable uploads to a given directory")
 	
 	args = parser.parse_args()
-		
-	try:
-		testit = open(args.filename, 'r')
-		testit.close()
-		FileHandler.filePath = args.filename
-		FileHandler.fileName = os.path.basename(args.filename)
-		FileHandler.fileLength = os.stat(args.filename)[ST_SIZE]
-	except IOError:
-		print "Error: Could not open file!"
-		sys.exit(3)
 
-	server = ThreadedHTTPServer(('', args.port), FileHandler)
+	handler = None
+	dirCreated = False
+	print args.upload
+	if not args.upload:
+		try:
+			testit = open(args.filename, 'r')
+			testit.close()
+			FileHandler.filePath = args.filename
+			FileHandler.fileName = os.path.basename(args.filename)
+			FileHandler.fileLength = os.stat(args.filename)[ST_SIZE]
+		except IOError:
+			print "Error: Could not open file!"
+			sys.exit(3)
+		handler = FileHandler
+	else:
+		if os.path.isdir(args.filename):
+			print "Warning: Uploading to an already existing directory"
+		elif not os.path.exists(args.filename):
+			dirCreated = True
+			try:
+				os.mkdir(args.filename)
+			except IOError, OSError:
+				print "Error: Could not create directory '%s' for uploads" % (args.filename,) 
+				sys.exit(3)
+		else:
+			print "Error: Upload directory already exists and is a file"
+			sys.exit(3)
+		FilePutter.targetDir = args.filename
+		handler = FilePutter
+	
+	server = ThreadedHTTPServer(('', args.port), handler)
 	print "Serving \"%s\" under port %d" % (args.filename, args.port)
 
 	# print urls with local network adresses
@@ -163,6 +230,7 @@ def main():
 	except KeyboardInterrupt:
 		server.socket.close()
 	print "Good bye.."
+	# XXX: cleanup upload directory
 
 if __name__ == '__main__':
 	main()
