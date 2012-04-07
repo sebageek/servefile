@@ -18,6 +18,7 @@ import socket
 from stat import ST_SIZE
 from subprocess import Popen, PIPE
 import sys
+import time
 
 class FileHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 	fileName = "Undefined"
@@ -116,20 +117,37 @@ class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
 		if destFileName == "":
 			self.sendResponse(400, "Filename was empty")
 			return
-		destFileName = self.targetDir + "/" + cleanFileName
-		if os.path.exists(destFileName):
-			i = 1
-			extraDestFileName = destFileName + "(%s)" % i
-			while os.path.exists(extraDestFileName):
-				i += 1
-				extraDestFileName = destFileName + "(%s)" % i
-			destFileName = extraDestFileName
-		print fstorage["file"].file
 		target = open(destFileName, "w")
 		target.write(fstorage["file"].file.read())
 		target.close()
-		msg = "OK!"
 		self.sendResponse(200, "OK!")
+
+	def do_PUT(self):
+		print self.headers
+		length = 0
+		try:
+			length = int(self.headers['Content-Length'])
+		except ValueError:
+			pass
+		if length <= 0:
+			self.sendResponse(400, "Content-Length was invalid or not set.")
+			return
+
+		fileName = urllib.unquote(self.path)
+		if fileName == "/":
+			fileName = str(time.time())
+		cleanFileName = self.getTargetName(fileName)
+		if cleanFileName == "":
+			self.sendResponse(400, "Filename was invalid")
+			return
+		if self.headers.getheader("Expect") == "100-continue":
+			self.send_response(100)
+			self.end_headers()
+		print "Saving uploaded file to %s" % fileName
+		target = open(cleanFileName, "w")
+		target.write(self.rfile.read(int(self.headers['Content-Length'])))
+		target.close()
+		self.sendResponse(201, "OK!")
 
 	def sendResponse(self, code, msg):
 		self.send_response(code)
@@ -137,7 +155,7 @@ class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
 		self.send_header('content-Length', str(len(msg)))
 		self.end_headers()
 		self.wfile.write(msg)
-	
+
 	def getTargetName(self, fname):
 		cleanFileName = fname.replace("/", "")
 		if cleanFileName == "":
