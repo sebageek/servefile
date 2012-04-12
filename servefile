@@ -108,6 +108,10 @@ class FileHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 		return myfile.read(readsize)
 
 class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
+	""" Simple HTTP Server which allows uploading to a specified directory
+	either via multipart/form-data or POST/PUT requests containing the file.
+	"""
+
 	targetDir = "unknown"
 	uploadPage = """
 <!docype html>
@@ -122,33 +126,54 @@ class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
 """
 
 	def do_GET(self):
+		""" Answer every GET request with the upload form """
 		self.sendResponse(200, self.uploadPage)
 
 	def do_POST(self):
-		env = os.environ
-		env['REQUEST_METHOD'] = "POST"
+		""" Upload a file via POST
+
+		If the content-type is multipart/form-data it checks for the file
+		field and saves the data to disk. For other content-types it just
+		calls do_PUT and is handled as such except for the http response code.
+
+		Files can be uploaded with wget --post-file=path/to/file <url> or
+		curl -X POST -d @file <url> .
+		"""
 		ctype = self.headers.getheader('content-type')
+
+		# check for multipart/form-data.
 		if not (ctype and ctype.lower().startswith("multipart/form-data")):
 			# not a normal multipart request ==> handle as PUT request
-			self.do_PUT()
-			return
-			self.sendResponse(400, "Request was not a multipart request. If you want to upload data with curl, do a PUT request, e.g. curl -X PUT -d @file http://ip:port/your-filename")
-			return
+			return self.do_PUT(fromPost=True)
 
+		# create FieldStorage object for multipart parsing
+		env = os.environ
+		env['REQUEST_METHOD'] = "POST"
+		fstorage = cgi.FieldStorage(fp=self.rfile, headers=self.headers, environ=env)
 		if not "file" in fstorage:
 			self.sendResponse(400, "No file found in request.")
 			return
-		fstorage = cgi.FieldStorage(fp=self.rfile, headers=self.headers, environ=env)
+
 		destFileName = self.getTargetName(fstorage["file"].filename)
 		if destFileName == "":
-			self.sendResponse(400, "Filename was empty")
+			self.sendResponse(400, "Filename was empty or invalid")
 			return
+
+		# write file down to disk, send an 
 		target = open(destFileName, "w")
 		target.write(fstorage["file"].file.read())
 		target.close()
 		self.sendResponse(200, "OK!")
 
-	def do_PUT(self):
+	def do_PUT(self, fromPost=False):
+		""" Upload a file via PUT
+
+		The request path is used as filename, so uploading a file to the url
+		http://host:8080/testfile will cause the file to be named testfile. If
+		no filename is given, a random name will be generated.
+
+		Files can be uploaded with e.g. curl -X POST -d @file <url> .
+		"""
 		length = 0
 		try:
 			length = int(self.headers['Content-Length'])
@@ -160,21 +185,29 @@ class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
 
 		fileName = urllib.unquote(self.path)
 		if fileName == "/":
+			# if no filename was given we have to generate one
 			fileName = str(time.time())
+
 		cleanFileName = self.getTargetName(fileName)
 		if cleanFileName == "":
 			self.sendResponse(400, "Filename was invalid")
 			return
+
+		# Sometimes clients want to be told to continue with their transfer
 		if self.headers.getheader("Expect") == "100-continue":
 			self.send_response(100)
 			self.end_headers()
+
 		print "Saving uploaded file to %s" % cleanFileName
 		target = open(cleanFileName, "w")
 		target.write(self.rfile.read(int(self.headers['Content-Length'])))
 		target.close()
-		self.sendResponse(201, "OK!")
+		self.sendResponse(fromPost and 200 or 201, "OK!")
 
 	def sendResponse(self, code, msg):
+		""" Send a HTTP response with code and msg, providing the correct
+		content-length.
+		"""
 		self.send_response(code)
 		self.send_header('Content-Type', 'text/html')
 		self.send_header('content-Length', str(len(msg)))
@@ -182,6 +215,12 @@ class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
 		self.wfile.write(msg)
 
 	def getTargetName(self, fname):
+		""" Generate a clean and secure filename.
+
+		This function takes a filename and strips all the slashes out of it.
+		If the file already exists in the target directory, a (NUM) will be 
+		appended, so no file will be overwritten.
+		"""
 		cleanFileName = fname.replace("/", "")
 		if cleanFileName == "":
 			return ""
