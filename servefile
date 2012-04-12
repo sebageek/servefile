@@ -11,6 +11,7 @@ import argparse
 import cgi
 import BaseHTTPServer
 import commands
+import datetime
 import urllib
 import os
 import SocketServer
@@ -20,19 +21,40 @@ from subprocess import Popen, PIPE
 import sys
 import time
 
+def getDateStrNow():
+	""" Get the current time formatted for HTTP header """
+	now = datetime.datetime.fromtimestamp(time.mktime(time.gmtime()))
+	return now.strftime("%a, %d %b %Y %H:%M:%S GMT")
+
 class FileHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 	fileName = "Undefined"
 	filePath = "/dev/null"
 	fileLength = 0
+	startTime = getDateStrNow()
 	blockSize = 1024 * 1024
-	
-	def do_GET(self):
+
+
+	def checkAndDoRedirect(self):
+		""" If request didn't request self.fileName redirect to self.fileName.
+
+		Returns True if a redirect was issued. """
 		if urllib.unquote(self.path) != "/" + self.fileName:
 			self.send_response(302)
 			self.send_header('Location', '/' + self.fileName)
 			self.end_headers()
-			return
+			return True
+		return False
 
+	def do_HEAD(self):
+		if self.checkAndDoRedirect():
+			return
+		self.send_response(200)
+		self.send_header('Content-Length', self.fileLength)
+		self.send_header('Last-Modified', self.startTime)
+		self.send_header('Content-Type', 'application/octet-stream')
+		self.end_headers()
+
+	def do_GET(self):
 		myfile = open(self.filePath, 'rb')
 		
 		# find out if this is a continuing download
@@ -63,7 +85,7 @@ class FileHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 			self.send_response(200)
 			self.send_header('Content-Length', self.fileLength)
 		self.send_header('Content-Disposition', 'attachment; filename="%s"' % self.fileName)
-		self.send_header('Content-type', 'application/octet-stream')
+		self.send_header('Content-Type', 'application/octet-stream')
 		self.send_header('Content-Transfer-Encoding', ' binary')
 		self.end_headers()
 		block = self.getChunk(myfile, fromto)
