@@ -52,6 +52,7 @@ class FileHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 		self.send_header('Content-Length', self.fileLength)
 		self.send_header('Last-Modified', self.startTime)
 		self.send_header('Content-Type', 'application/octet-stream')
+		self.send_header('Content-Disposition', 'attachment; filename="%s"' % self.fileName)
 		self.end_headers()
 
 	def do_GET(self):
