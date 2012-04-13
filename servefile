@@ -332,7 +332,7 @@ class ServeFile():
 			handler = FileHandler
 		elif self.serveMode == self.MODE_UPLOAD:
 			if os.path.isdir(self.target):
-				raise ServeFileException("Warning: Uploading to an already existing directory")
+				print "Warning: Uploading to an already existing directory"
 			elif not os.path.exists(self.target):
 				self.dirCreated = True
 				try:
