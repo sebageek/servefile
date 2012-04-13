@@ -56,6 +56,8 @@ class FileHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 		self.end_headers()
 
 	def do_GET(self):
+		if self.checkAndDoRedirect():
+			return
 		myfile = open(self.filePath, 'rb')
 		
 		# find out if this is a continuing download
@@ -87,7 +89,7 @@ class FileHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 			self.send_header('Content-Length', self.fileLength)
 		self.send_header('Content-Disposition', 'attachment; filename="%s"' % self.fileName)
 		self.send_header('Content-Type', 'application/octet-stream')
-		self.send_header('Content-Transfer-Encoding', ' binary')
+		self.send_header('Content-Transfer-Encoding', 'binary')
 		self.end_headers()
 		block = self.getChunk(myfile, fromto)
 		while block:
@@ -178,7 +180,7 @@ class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
 		length = 0
 		try:
 			length = int(self.headers['Content-Length'])
-		except ValueError:
+		except (ValueError, KeyError):
 			pass
 		if length <= 0:
 			self.sendResponse(400, "Content-Length was invalid or not set.")
@@ -211,7 +213,7 @@ class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
 		"""
 		self.send_response(code)
 		self.send_header('Content-Type', 'text/html')
-		self.send_header('content-Length', str(len(msg)))
+		self.send_header('Content-Length', str(len(msg)))
 		self.end_headers()
 		self.wfile.write(msg)
 
@@ -240,10 +242,113 @@ class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
 class ThreadedHTTPServer(SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer):
 	pass
 
+class ServeFileException(Exception):
+	pass
+
+class ServeFile():
+	""" Main class to manage everything. """
+
+	(MODE_SINGLE, MODE_UPLOAD, MODE_DIRLIST) = range(3)
+
+	def __init__(self, target, port=8080, serveMode=0):
+		self.target = target
+		self.port = port
+		self.serveMode = serveMode
+		self.dirCreated = False
+
+		if self.serveMode not in range(3):
+			self.serveMode = None
+			raise ValueError("Unknown serve mode, needs to be MODE_SINGLE, MODE_UPLOAD or MODE_DIRLIST")
+
+	def getIPs(self):
+		""" Get IPs from all interfaces via ip or ifconfig. """
+		# ip and ifconfig sometimes are located in /sbin/
+		os.environ['PATH'] += ':/sbin:/usr/sbin'
+		proc = Popen(r"ip addr|" + \
+					  "sed -n -e 's/.*inet6\? \([0-9.a-fA-F:]\+\)\/.*/\\1/ p'|" + \
+					  "grep -v '^fe80\|^127.0.0.1\|^::1'", shell=True, stdout=PIPE)
+		if proc.wait() != 0:
+			# ip failed somehow, falling back to ifconfig
+			oldLang = os.environ.get("LC_ALL", None)
+			os.environ['LC_ALL'] = "C"
+			proc = Popen(r"ifconfig|" + \
+						  "sed -n 's/.*inet6\? addr: \?\([0-9a-fA-F.:]*\).*/" + \
+						  "\\1/p'|" + \
+						  "grep -v '^fe80\|^127.0.0.1\|^::1'", \
+						  shell=True, stdout=PIPE, stderr=PIPE)
+			if oldLang:
+				os.environ['LC_ALL'] = oldLang
+			else:
+				del(os.environ['LC_ALL'])
+			if proc.wait() != 0:
+				print "Error: Could not locate any ips for you."
+				proc = None
+		if proc:
+			ips = proc.stdout.read().strip().split("\n")
+			# FIXME: When BaseHTTP supports ipv6 properly, delete this line
+			ips = filter(lambda ip: ip.find(":") == -1, ips)
+			return ips
+		return None
+	
+	def serve(self):
+		self.handler = self._confAndFindHandler()
+		server = ThreadedHTTPServer(('', self.port), self.handler)
+		if self.serveMode != self.MODE_UPLOAD:
+			print "Serving \"%s\" under port %d" % (self.target, self.port)
+		else:
+			print "Serving \"%s\" for uploads under port %d" % (self.target, self.port)
+
+		# print urls with local network adresses
+		print "\nSome addresses this will be available under:"
+		ips = self.getIPs()
+		if not ips or len(ips) == 0 or ips[0] == '':
+			print "Could not find any addresses"
+		else:
+			for ip in ips:
+				print "http://%s:%d/" % (ip, self.port)
+		print ""
+
+		try:
+			server.serve_forever()
+		except KeyboardInterrupt:
+			server.socket.close()
+
+		# cleanup potential upload directory
+		if self.dirCreated and len(os.listdir(self.target)) == 0:
+			# created upload dir was not used
+			os.rmdir(self.target)
+
+	def _confAndFindHandler(self):
+		handler = None
+		if self.serveMode == self.MODE_SINGLE:
+			try:
+				testit = open(self.target, 'r')
+				testit.close()
+				FileHandler.filePath = self.target
+				FileHandler.fileName = os.path.basename(self.target)
+				FileHandler.fileLength = os.stat(self.target)[ST_SIZE]
+			except IOError:
+				raise ServeFileException("Error: Could not open file!")
+			handler = FileHandler
+		elif self.serveMode == self.MODE_UPLOAD:
+			if os.path.isdir(self.target):
+				raise ServeFileException("Warning: Uploading to an already existing directory")
+			elif not os.path.exists(self.target):
+				self.dirCreated = True
+				try:
+					os.mkdir(self.target)
+				except IOError, OSError:
+					raise ServeFileException("Error: Could not create directory '%s' for uploads" % (self.target,) )
+			else:
+				raise ServeFileException("Error: Upload directory already exists and is a file")
+			FilePutter.targetDir = self.target
+			handler = FilePutter
+		return handler
+
 def main():
 	parser = argparse.ArgumentParser(description='Serve a single file via HTTP')
 	parser.add_argument('--version', action='version', version='%(prog)s ' + __version__)
-	parser.add_argument('filename', metavar='file/directory', type=str)
+	parser.add_argument('target', metavar='file/directory', type=str)
 	parser.add_argument('-p', '--port', type=int, default=8080, \
 	                    help='port to listen on')
 	parser.add_argument('-u', '--upload', action="store_true", default=False, \
@@ -251,86 +356,25 @@ def main():
 	
 	args = parser.parse_args()
 
-	handler = None
-	dirCreated = False
-	if not args.upload:
-		try:
-			testit = open(args.filename, 'r')
-			testit.close()
-			FileHandler.filePath = args.filename
-			FileHandler.fileName = os.path.basename(args.filename)
-			FileHandler.fileLength = os.stat(args.filename)[ST_SIZE]
-		except IOError:
-			print "Error: Could not open file!"
-			sys.exit(3)
-		handler = FileHandler
-	else:
-		if os.path.isdir(args.filename):
-			print "Warning: Uploading to an already existing directory"
-		elif not os.path.exists(args.filename):
-			dirCreated = True
-			try:
-				os.mkdir(args.filename)
-			except IOError, OSError:
-				print "Error: Could not create directory '%s' for uploads" % (args.filename,) 
-				sys.exit(3)
-		else:
-			print "Error: Upload directory already exists and is a file"
-			sys.exit(3)
-		FilePutter.targetDir = args.filename
-		handler = FilePutter
-	
-	server = ThreadedHTTPServer(('', args.port), handler)
+	# check for invalid option combinations
+
+	mode = None
 	if args.upload:
-		print "Serving \"%s\" under port %d" % (args.filename, args.port)
+		mode = ServeFile.MODE_UPLOAD
+	#elif args.listdir:
+	#	mode = ServeFile.MODE_LISTDIR
 	else:
-		print "Serving \"%s\" for uploads under port %d" % (args.filename, args.port)
+		mode = ServeFile.MODE_SINGLE
 
-	# print urls with local network adresses
-	print "\nSome addresses this will be available under:"
-
-	# ip and ifconfig sometimes are located in /sbin/
-	os.environ['PATH'] += ':/sbin:/usr/sbin'
-	proc = Popen(r"ip addr|" + \
-	              "sed -n -e 's/.*inet6\? \([0-9.a-fA-F:]\+\)\/.*/\\1/ p'|" + \
-	              "grep -v '^fe80\|^127.0.0.1\|^::1'", shell=True, stdout=PIPE)
-	if proc.wait() != 0:
-		# ip failed somehow, falling back to ifconfig
-		oldLang = os.environ.get("LC_ALL", None)
-		os.environ['LC_ALL'] = "C"
-		proc = Popen(r"ifconfig|" + \
-		              "sed -n 's/.*inet6\? addr: \?\([0-9a-fA-F.:]*\).*/" + \
-					  "\\1/p'|" + \
-					  "grep -v '^fe80\|^127.0.0.1\|^::1'", \
-					  shell=True, stdout=PIPE, stderr=PIPE)
-		if oldLang:
-			os.environ['LC_ALL'] = oldLang
-		else:
-			del(os.environ['LC_ALL'])
-		if proc.wait() != 0:
-			print "Error: Could not locate any ips for you."
-			proc = None
-	if proc:
-		ips = proc.stdout.read().strip()
-		for ip in ips.split("\n"):
-			if ip.find(":") >= 0:
-				# ipv6
-				ip = "[%s]" % ip
-				# FIXME: When BaseHTTP supports ipv6 properly, delete this line
-				continue	
-			print "http://%s:%d/" % (ip, args.port)
-
+	server = None
 	try:
-		server.serve_forever()
-	except KeyboardInterrupt:
-		server.socket.close()
-
-	# cleanup potential upload directory
-	if dirCreated and len(os.listdir(args.filename)) == 0:
-		# created upload dir was not used
-		os.rmdir(args.filename)
+		server = ServeFile(args.target, args.port, mode)
+		server.serve()
+	except ServeFileException, e:
+		print e
+		sys.exit(1)
 	print "Good bye.."
-
+	
 if __name__ == '__main__':
 	main()
 
