@@ -21,6 +21,14 @@ from subprocess import Popen, PIPE
 import sys
 import time
 
+# only activate SSL if available
+HAVE_SSL = False
+try:
+	from OpenSSL import SSL, crypto
+	HAVE_SSL = True
+except ImportError:
+	pass
+
 def getDateStrNow():
 	""" Get the current time formatted for HTTP header """
 	now = datetime.datetime.fromtimestamp(time.mktime(time.gmtime()))
@@ -201,7 +209,6 @@ class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
 			self.send_response(100)
 			self.end_headers()
 
-		print "Saving uploaded file to %s" % cleanFileName
 		target = open(cleanFileName, "w")
 		target.write(self.rfile.read(int(self.headers['Content-Length'])))
 		target.close()
@@ -242,6 +249,41 @@ class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
 class ThreadedHTTPServer(SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer):
 	pass
 
+def catchSSLErrors(BaseSSLClass):
+	""" Class decorator which catches SSL errors and prints them. """
+	class X(BaseSSLClass):
+		def handle_one_request(self, *args, **kwargs):
+			try:
+				BaseSSLClass.handle_one_request(self, *args, **kwargs)
+			except SSL.Error, e:
+				if str(e) == "":
+					print "%s SSL Error (Empty error message)" % (self.client_address[0],)
+				else:
+					print "%s SSL Error: %s" % (self.client_address[0], e)
+	return X
+
+class SecureThreadedHTTPServer(ThreadedHTTPServer):
+	def __init__(self, pubKey, privKey, *args, **kwargs):
+		ThreadedHTTPServer.__init__(self, *args, **kwargs)
+		ctx = SSL.Context(SSL.SSLv23_METHOD)
+		ctx.use_certificate_file(pubKey)
+		ctx.use_privatekey_file(privKey)
+
+		self.bsocket = socket.socket(self.address_family, self.socket_type)
+		self.socket = SSL.Connection(ctx, self.bsocket)
+
+		self.server_bind()
+		self.server_activate()
+
+	def shutdown_request(self, request):
+		request.shutdown()
+
+class SecureHandler():
+	def setup(self):
+		self.connection = self.request
+		self.rfile = socket._fileobject(self.request, "rb", self.rbufsize)
+		self.wfile = socket._fileobject(self.request, "wb", self.wbufsize)
+
 class ServeFileException(Exception):
 	pass
 
@@ -250,11 +292,13 @@ class ServeFile():
 
 	(MODE_SINGLE, MODE_UPLOAD, MODE_DIRLIST) = range(3)
 
-	def __init__(self, target, port=8080, serveMode=0):
+	def __init__(self, target, port=8080, serveMode=0, useSSL=False):
 		self.target = target
 		self.port = port
 		self.serveMode = serveMode
 		self.dirCreated = False
+		self.useSSL = useSSL
+		self.certPath = self.keyPath = None
 
 		if self.serveMode not in range(3):
 			self.serveMode = None
@@ -281,7 +325,7 @@ class ServeFile():
 			else:
 				del(os.environ['LC_ALL'])
 			if proc.wait() != 0:
-				print "Error: Could not locate any ips for you."
+				# we couldn't find any ip address
 				proc = None
 		if proc:
 			ips = proc.stdout.read().strip().split("\n")
@@ -289,10 +333,29 @@ class ServeFile():
 			ips = filter(lambda ip: ip.find(":") == -1, ips)
 			return ips
 		return None
+
+	def setupSSLKeys(self, cert, key):
+		self.certPath = cert
+		self.keyPath = key
 	
+	def _getCert(self):
+		return self.certPath
+
+	def _getKey(self):
+		return self.keyPath
+	
+	def _createServer(self, handler):
+		server = None
+		if self.useSSL:
+			server = SecureThreadedHTTPServer(self._getCert(), self._getKey(), ('', self.port), handler)
+		else:
+			server = ThreadedHTTPServer(('', self.port), handler)
+		return server
+
 	def serve(self):
 		self.handler = self._confAndFindHandler()
-		server = ThreadedHTTPServer(('', self.port), self.handler)
+		self.server = self._createServer(self.handler)
+
 		if self.serveMode != self.MODE_UPLOAD:
 			print "Serving \"%s\" under port %d" % (self.target, self.port)
 		else:
@@ -305,13 +368,13 @@ class ServeFile():
 			print "Could not find any addresses"
 		else:
 			for ip in ips:
-				print "http://%s:%d/" % (ip, self.port)
+				print "http%s://%s:%d/" % (self.useSSL and "s" or "", ip, self.port)
 		print ""
 
 		try:
-			server.serve_forever()
+			self.server.serve_forever()
 		except KeyboardInterrupt:
-			server.socket.close()
+			self.server.socket.close()
 
 		# cleanup potential upload directory
 		if self.dirCreated and len(os.listdir(self.target)) == 0:
@@ -343,6 +406,13 @@ class ServeFile():
 				raise ServeFileException("Error: Upload directory already exists and is a file")
 			FilePutter.targetDir = self.target
 			handler = FilePutter
+
+		if self.useSSL:
+			# secure handler
+			@catchSSLErrors
+			class AlreadySecuredHandler(SecureHandler, handler):
+				pass
+			handler = AlreadySecuredHandler
 		return handler
 
 def main():
@@ -353,10 +423,27 @@ def main():
 	                    help='port to listen on')
 	parser.add_argument('-u', '--upload', action="store_true", default=False, \
 	                    help="Enable uploads to a given directory")
+	parser.add_argument('--ssl', action="store_true", default=False, \
+	                    help="Enable SSL. If no key/cert is specified one will be generated.")
+	parser.add_argument('--key', type=str, \
+	                    help="Keyfile to use for SSL. If no cert is given with --cert the keyfile will also be searched for a cert")
+	parser.add_argument('--cert', type=str, \
+	                    help="Certfile to use for SSL")
 	
 	args = parser.parse_args()
 
 	# check for invalid option combinations
+	if args.ssl and not HAVE_SSL:
+		print "Error: SSL is not available, please install pyssl (python-openssl)"
+		sys.exit(1)
+
+	if args.cert and not args.key:
+		print "Error: Please specify a key along with your cert"
+		sys.exit(1)
+
+	if not args.ssl and (args.cert or args.key):
+		print "Error: You need to turn on ssl with --ssl when specifying certs/keys"
+		sys.exit(1)
 
 	mode = None
 	if args.upload:
@@ -368,7 +455,10 @@ def main():
 
 	server = None
 	try:
-		server = ServeFile(args.target, args.port, mode)
+		server = ServeFile(args.target, args.port, mode, args.ssl)
+		if args.ssl and args.key:
+			cert = args.cert or args.key
+			server.setupSSLKeys(cert, args.key)
 		server.serve()
 	except ServeFileException, e:
 		print e
