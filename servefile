@@ -15,6 +15,7 @@ import commands
 import datetime
 import urllib
 import os
+import re
 import SocketServer
 import socket
 from stat import ST_SIZE
@@ -124,7 +125,8 @@ class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
 	either via multipart/form-data or POST/PUT requests containing the file.
 	"""
 
-	targetDir = "unknown"
+	targetDir = None
+	maxUploadSize = 0
 	uploadPage = """
 <!docype html>
 <html>
@@ -151,7 +153,10 @@ class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
 		Files can be uploaded with wget --post-file=path/to/file <url> or
 		curl -X POST -d @file <url> .
 		"""
-		ctype = self.headers.getheader('content-type')
+		length = self.getContentLength()
+		if length < 0:
+			return
+		ctype = self.headers.getheader('Content-Type')
 
 		# check for multipart/form-data.
 		if not (ctype and ctype.lower().startswith("multipart/form-data")):
@@ -173,7 +178,7 @@ class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
 
 		# write file down to disk, send an 
 		target = open(destFileName, "w")
-		target.write(fstorage["file"].file.read())
+		target.write(fstorage["file"].file.read(length))
 		target.close()
 		self.sendResponse(200, "OK!")
 
@@ -186,13 +191,8 @@ class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
 
 		Files can be uploaded with e.g. curl -X POST -d @file <url> .
 		"""
-		length = 0
-		try:
-			length = int(self.headers['Content-Length'])
-		except (ValueError, KeyError):
-			pass
-		if length <= 0:
-			self.sendResponse(400, "Content-Length was invalid or not set.")
+		length = self.getContentLength()
+		if length < 0:
 			return
 
 		fileName = urllib.unquote(self.path)
@@ -214,6 +214,20 @@ class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
 		target.write(self.rfile.read(int(self.headers['Content-Length'])))
 		target.close()
 		self.sendResponse(fromPost and 200 or 201, "OK!")
+
+	def getContentLength(self):
+		length = 0
+		try:
+			length = int(self.headers['Content-Length'])
+		except (ValueError, KeyError):
+			pass
+		if length <= 0:
+			self.sendResponse(400, "Content-Length was invalid or not set.")
+			return -1
+		if length > self.maxUploadSize:
+			self.sendResponse(413, "Your file was too big! Maximum allowed size is %d byte. <a href=\"/\">back</a>" % self.maxUploadSize)
+			return -1
+		return length
 
 	def sendResponse(self, code, msg):
 		""" Send a HTTP response with code and msg, providing the correct
@@ -305,6 +319,7 @@ class ServeFile():
 		self.useSSL = useSSL
 		self.cert = self.key = None
 		self.auth = None
+		self.maxUploadSize = 0
 
 		if self.serveMode not in range(3):
 			self.serveMode = None
@@ -345,6 +360,10 @@ class ServeFile():
 		""" Set SSL cert/key. Can be either path to file or pyssl X509/PKey object. """
 		self.cert = cert
 		self.key = key
+
+	def setMaxUploadSize(self, limit):
+		""" Set the maximum upload size in byte """
+		self.maxUploadSize = limit
 
 	def genKeyPair(self):
 		print "Generating SSL certificate...",
@@ -461,6 +480,7 @@ class ServeFile():
 			else:
 				raise ServeFileException("Error: Upload directory already exists and is a file")
 			FilePutter.targetDir = self.target
+			FilePutter.maxUploadSize = self.maxUploadSize
 			handler = FilePutter
 
 		if self.auth:
@@ -518,6 +538,8 @@ def main():
 	                    help='port to listen on')
 	parser.add_argument('-u', '--upload', action="store_true", default=False, \
 	                    help="Enable uploads to a given directory")
+	parser.add_argument('-s', '--max-upload-size', type=str, \
+	                    help="Limit uploadsize in kb. Size modifiers are allowed, e.g. 2G, 12Mb, 1b.")
 	parser.add_argument('--ssl', action="store_true", default=False, \
 	                    help="Enable SSL. If no key/cert is specified one will be generated.")
 	parser.add_argument('--key', type=str, \
@@ -528,8 +550,26 @@ def main():
 	                    help="Set user and password for HTTP basic authentication")
 	
 	args = parser.parse_args()
+	maxUploadSize = 0
 
-	# check for invalid option combinations
+	# check for invalid option combinations/preparse stuff
+	if args.max_upload_size and not args.upload:
+		print "Error: max upload size can only be specified when in upload mode"
+		sys.exit(1)
+
+	if args.max_upload_size:
+		sizeRe = re.match("^(\d+(?:[,.]\d+)?)(?:([bkmgtpe])(?:(?<!b)b?)?)?$", args.max_upload_size.lower())
+		if not sizeRe:
+			print "Error: Your max upload size param is broken."
+			sys.exit(1)
+		uploadSize, modifier = sizeRe.groups()
+		uploadSize = float(uploadSize.replace(",", "."))
+		sizes = ["b", "k", "m", "g", "t", "p", "e"]
+		maxUploadSize = int(uploadSize * pow(1024, sizes.index(modifier or "k")))
+		if maxUploadSize < 0:
+			print "Error: Your max upload size can't be negative"
+			sys.exit(1)
+
 	if args.ssl and not HAVE_SSL:
 		print "Error: SSL is not available, please install pyssl (python-openssl)"
 		sys.exit(1)
@@ -559,6 +599,8 @@ def main():
 	server = None
 	try:
 		server = ServeFile(args.target, args.port, mode, args.ssl)
+		if maxUploadSize > 0:
+			server.setMaxUploadSize(maxUploadSize)
 		if args.ssl and args.key:
 			cert = args.cert or args.key
 			server.setSSLKeys(cert, args.key)
