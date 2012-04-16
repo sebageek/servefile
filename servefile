@@ -316,7 +316,8 @@ class ServeFile():
 		os.environ['PATH'] += ':/sbin:/usr/sbin'
 		proc = Popen(r"ip addr|" + \
 					  "sed -n -e 's/.*inet6\? \([0-9.a-fA-F:]\+\)\/.*/\\1/ p'|" + \
-					  "grep -v '^fe80\|^127.0.0.1\|^::1'", shell=True, stdout=PIPE)
+					  "grep -v '^fe80\|^127.0.0.1\|^::1'", \
+					  shell=True, stdout=PIPE, stderr=PIPE)
 		if proc.wait() != 0:
 			# ip failed somehow, falling back to ifconfig
 			oldLang = os.environ.get("LC_ALL", None)
