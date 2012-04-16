@@ -16,6 +16,7 @@ import datetime
 import urllib
 import os
 import re
+import SimpleHTTPServer
 import SocketServer
 import socket
 from stat import ST_SIZE
@@ -309,7 +310,7 @@ class ServeFileException(Exception):
 class ServeFile():
 	""" Main class to manage everything. """
 
-	(MODE_SINGLE, MODE_UPLOAD, MODE_DIRLIST) = range(3)
+	(MODE_SINGLE, MODE_UPLOAD, MODE_LISTDIR) = range(3)
 
 	def __init__(self, target, port=8080, serveMode=0, useSSL=False):
 		self.target = target
@@ -482,6 +483,13 @@ class ServeFile():
 			FilePutter.targetDir = self.target
 			FilePutter.maxUploadSize = self.maxUploadSize
 			handler = FilePutter
+		elif self.serveMode == self.MODE_LISTDIR:
+			try:
+				os.chdir(self.target)
+			except OSError:
+				raise ServeFileException("Error: Could not change directory to '%s'" % self.target)
+			handler = SimpleHTTPServer.SimpleHTTPRequestHandler
+			
 
 		if self.auth:
 			# do authentication
@@ -540,6 +548,8 @@ def main():
 	                    help="Enable uploads to a given directory")
 	parser.add_argument('-s', '--max-upload-size', type=str, \
 	                    help="Limit uploadsize in kb. Size modifiers are allowed, e.g. 2G, 12Mb, 1b.")
+	parser.add_argument('-l', '--list-dir', action="store_true", default=False, \
+	                    help="Show directory indexes and allow access to all subdirectories")
 	parser.add_argument('--ssl', action="store_true", default=False, \
 	                    help="Enable SSL. If no key/cert is specified one will be generated.")
 	parser.add_argument('--key', type=str, \
@@ -591,8 +601,8 @@ def main():
 	mode = None
 	if args.upload:
 		mode = ServeFile.MODE_UPLOAD
-	#elif args.listdir:
-	#	mode = ServeFile.MODE_LISTDIR
+	elif args.list_dir:
+		mode = ServeFile.MODE_LISTDIR
 	else:
 		mode = ServeFile.MODE_SINGLE
 
