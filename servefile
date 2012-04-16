@@ -8,6 +8,7 @@
 __version__ = '0.3.2'
 
 import argparse
+import base64
 import cgi
 import BaseHTTPServer
 import commands
@@ -303,6 +304,7 @@ class ServeFile():
 		self.dirCreated = False
 		self.useSSL = useSSL
 		self.cert = self.key = None
+		self.auth = None
 
 		if self.serveMode not in range(3):
 			self.serveMode = None
@@ -390,6 +392,11 @@ class ServeFile():
 	def _getKey(self):
 		return self.key
 	
+	def setAuth(self, user, password):
+		if len(user) == "" or len(password) == "":
+			raise ServeFileException("User and password both need to be at least one character long")
+		self.auth = base64.b64encode("%s:%s" % (user, password))
+
 	def _createServer(self, handler):
 		server = None
 		if self.useSSL:
@@ -455,6 +462,13 @@ class ServeFile():
 			FilePutter.targetDir = self.target
 			handler = FilePutter
 
+		if self.auth:
+			# do authentication
+			AuthenticationHandler.authString = self.auth
+			class AuthenticatedHandler(AuthenticationHandler, handler):
+				pass
+			handler = AuthenticatedHandler
+
 		if self.useSSL:
 			# secure handler
 			@catchSSLErrors
@@ -462,6 +476,38 @@ class ServeFile():
 				pass
 			handler = AlreadySecuredHandler
 		return handler
+
+class AuthenticationHandler():
+	# base64 encoded user:password string for authentication
+	authString = None
+	realm = "Restricted area"
+
+	def handle_one_request(self):
+		""" Overloaded function to handle one request.
+
+		Before calling the responsible do_METHOD function, check credentials
+		"""
+		self.raw_requestline = self.rfile.readline()
+		if not self.raw_requestline:
+			self.close_connection = 1
+			return
+		if not self.parse_request(): # An error code has been sent, just exit
+			return
+
+		authorized = False
+		if "Authorization" in self.headers:
+			if self.headers["Authorization"] == ("Basic " + self.authString):
+				authorized = True
+		if authorized:
+			mname = 'do_' + self.command
+			if not hasattr(self, mname):
+				self.send_error(501, "Unsupported method (%r)" % self.command)
+				return
+			method = getattr(self, mname)
+			method()
+		else:
+			self.send_response(401)
+			self.send_header("WWW-Authenticate", "Basic realm=\"%s\"" % self.realm)
 
 def main():
 	parser = argparse.ArgumentParser(description='Serve a single file via HTTP')
@@ -477,6 +523,8 @@ def main():
 	                    help="Keyfile to use for SSL. If no cert is given with --cert the keyfile will also be searched for a cert")
 	parser.add_argument('--cert', type=str, \
 	                    help="Certfile to use for SSL")
+	parser.add_argument('-a', '--auth', type=str, metavar='user:password', \
+	                    help="Set user and password for HTTP basic authentication")
 	
 	args = parser.parse_args()
 
@@ -493,6 +541,12 @@ def main():
 		print "Error: You need to turn on ssl with --ssl when specifying certs/keys"
 		sys.exit(1)
 
+	if args.auth:
+		dpos = args.auth.find(":")
+		if dpos <= 0 or dpos == (len(args.auth)-1):
+			print "Error: User and password for HTTP basic auth need to be both at least one character long and have to be seperated by a \":\""
+			sys.exit(1)
+
 	mode = None
 	if args.upload:
 		mode = ServeFile.MODE_UPLOAD
@@ -507,6 +561,9 @@ def main():
 		if args.ssl and args.key:
 			cert = args.cert or args.key
 			server.setSSLKeys(cert, args.key)
+		if args.auth:
+			user, password = args.auth.split(":", 1)
+			server.setAuth(user, password)
 		server.serve()
 	except ServeFileException, e:
 		print e
