@@ -344,6 +344,9 @@ class ServeFile():
 		self.key = key
 
 	def genKeyPair(self):
+		print "Generating SSL certificate...",
+		sys.stdout.flush()
+
 		pkey = crypto.PKey()
 		pkey.generate_key(crypto.TYPE_RSA, 2048)
 
@@ -378,6 +381,8 @@ class ServeFile():
 
 		self.cert = cert
 		self.key = pkey
+
+		print "done."
 	
 	def _getCert(self):
 		return self.cert
