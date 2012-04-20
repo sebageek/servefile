@@ -406,6 +406,8 @@ class ServeFile():
 		self.key = pkey
 
 		print "done."
+		print "SHA1 fingerprint:", cert.digest("sha1")
+		print "MD5  fingerprint:", cert.digest("md5")
 	
 	def _getCert(self):
 		return self.cert
