@@ -1,4 +1,4 @@
-.TH SERVEFILE "1" "April 2012" "servefile 0.4.0" "User Commands"
+.TH SERVEFILE "20" "April 2012" "servefile 0.4.0" "User Commands"
 
 .SH NAME
 servefile \- small HTTP-Server for transitional file transfer
@@ -74,26 +74,18 @@ Certfile to use for SSL
 Set user and password for HTTP basic authentication
 .SH EXAMPLES
 Serving a single file with SSL and HTTP Basic auth:
-.PP
-.Vb 1
-        servefile --ssl --auth foo:bar the_file
-.Ve
+.IP
+servefile \-\-ssl \-\-auth foo:bar the_file
 .PP
 Enabling uploads to a directory:
-.PP
-.Bv 1
-        servefile -u dir/
-.Ve
+.IP
+servefile \-u dir/
 .PP
 Uploading file foo as bar to servefile via command line:
 .PP
-.Bv 1
-        curl -X PUT http://ip:port/bar -d @foo 
-        curl -X POST http://ip:port/bar -d @foo 
-        wget http://ip:port/bar --post-file=foo
-.Ve
+       curl \-X PUT http://ip:port/bar \-d @foo 
+       curl \-X POST http://ip:port/bar \-d @foo 
+       wget http://ip:port/bar \-\-post-file=foo
 .PP
 .SH AUTHOR
 servefile is developed by Sebastian Lohff <seba@someserver.de>
-
-.SH COPYRIGHT
