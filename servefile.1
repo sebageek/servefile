@@ -1,0 +1,99 @@
+.TH SERVEFILE "1" "April 2012" "servefile 0.4.0" "User Commands"
+
+.SH NAME
+servefile \- small HTTP-Server for transitional file transfer
+
+.SH SYNOPSIS
+.B servefile
+[\fI\-h\fR\fR] [\fI\-\-version\fR] [\fI\-p PORT\fR] [\fI\-u\fR] [\fI\-s MAX_UPLOAD_SIZE\fR] [\fI\-l\fR]
+.IP
+[\fI\-\-ssl\fR] [\fI\-\-key KEY\fR] [\fI\-\-cert CERT\fR] [\fI\-a user:password\fR]
+\fIfile/directory\fR
+
+.SH DISCLAIMER
+Do not use this as a normal webserver. This server is optimized for running
+a short time and to send files to other people, not for doing performant
+static file serving.
+
+.SH DESCRIPTION
+servefile is a small HTTP-server indented for transitional file transfer
+mostly in the local network. It aims to make transfer of single files as
+painless as possible.
+
+Without any options servefile serves just one file and redirects all HTTP
+requests to that one file.
+
+Uploads can be done with curl, wget (see EXAMPLES) or a normal browser.
+In upload mode with \fI\-u\fR servefile creates a directory and saves all
+uploads into that directory. When uploading with curl or wget the filename
+is taken out of the path part of the url used for the upload.
+
+For SSL support python-openssl (pyssl) needs to be installed. If no key and
+cert is given, servefile will generate a keypair for you and display its
+fingerprint.
+
+.SH COMMAND SUMMARY
+.SS "positional arguments:"
+.TP
+\fIfile/directory\fR
+file or directory (with \fB\-l\fR or  \fB\-u\fR) which should be served or uploaded to
+.SS "optional arguments:"
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Show this help message and exit
+.TP
+\fB\-\-version\fR
+Show program's version number and exit
+.TP
+\fB\-p\fR PORT, \fB\-\-port\fR PORT
+Port to listen on
+.TP
+\fB\-u\fR, \fB\-\-upload\fR
+Enable uploads to a given directory
+.TP
+\fB\-s\fR MAX_UPLOAD_SIZE, \fB\-\-max\-upload\-size\fR MAX_UPLOAD_SIZE
+Limit uploadsize in kb. Size modifiers are allowed,
+e.g. 2G, 12Mb, 1b.
+.TP
+\fB\-l\fR, \fB\-\-list\-dir\fR
+Show directory indexes and allow access to all
+subdirectories
+.TP
+\fB\-\-ssl\fR
+Enable SSL. If no key/cert is specified one will be
+generated.
+.TP
+\fB\-\-key\fR KEY
+Keyfile to use for SSL. If no cert is given with
+\fB\-\-cert\fR the keyfile will also be searched for a cert
+.TP
+\fB\-\-cert\fR CERT
+Certfile to use for SSL
+.TP
+\fB\-a\fR user:password, \fB\-\-auth\fR user:password
+Set user and password for HTTP basic authentication
+.SH EXAMPLES
+Serving a single file with SSL and HTTP Basic auth:
+.PP
+.Vb 1
+        servefile --ssl --auth foo:bar the_file
+.Ve
+.PP
+Enabling uploads to a directory:
+.PP
+.Bv 1
+        servefile -u dir/
+.Ve
+.PP
+Uploading file foo as bar to servefile via command line:
+.PP
+.Bv 1
+        curl -X PUT http://ip:port/bar -d @foo 
+        curl -X POST http://ip:port/bar -d @foo 
+        wget http://ip:port/bar --post-file=foo
+.Ve
+.PP
+.SH AUTHOR
+servefile is developed by Sebastian Lohff <seba@someserver.de>
+
+.SH COPYRIGHT
