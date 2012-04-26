@@ -225,7 +225,7 @@ class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
 		if length <= 0:
 			self.sendResponse(411, "Content-Length was invalid or not set.")
 			return -1
-		if length > self.maxUploadSize:
+		if self.maxUploadSize > 0 and length > self.maxUploadSize:
 			self.sendResponse(413, "Your file was too big! Maximum allowed size is %d byte. <a href=\"/\">back</a>" % self.maxUploadSize)
 			return -1
 		return length
