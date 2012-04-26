@@ -37,14 +37,8 @@ def getDateStrNow():
 	now = datetime.datetime.fromtimestamp(time.mktime(time.gmtime()))
 	return now.strftime("%a, %d %b %Y %H:%M:%S GMT")
 
-class FileHandler(BaseHTTPServer.BaseHTTPRequestHandler):
+class FileBaseHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 	fileName = "Undefined"
-	filePath = "/dev/null"
-	fileLength = 0
-	startTime = getDateStrNow()
-	blockSize = 1024 * 1024
-
-
 	def checkAndDoRedirect(self):
 		""" If request didn't request self.fileName redirect to self.fileName.
 
@@ -55,6 +49,12 @@ class FileHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 			self.end_headers()
 			return True
 		return False
+
+class FileHandler(FileBaseHandler):
+	filePath = "/dev/null"
+	fileLength = 0
+	startTime = getDateStrNow()
+	blockSize = 1024 * 1024
 
 	def do_HEAD(self):
 		if self.checkAndDoRedirect():
