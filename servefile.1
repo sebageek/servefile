@@ -1,7 +1,7 @@
 .TH SERVEFILE "20" "April 2012" "servefile 0.4.0" "User Commands"
 
 .SH NAME
-servefile \- small HTTP-Server for transitional file transfer
+servefile \- small HTTP-Server for temporary file transfer
 
 .SH SYNOPSIS
 .B servefile
@@ -16,17 +16,17 @@ a short time and to send files to other people, not for doing performant
 static file serving.
 
 .SH DESCRIPTION
-servefile is a small HTTP-server indented for transitional file transfer
-mostly in the local network. It aims to make transfer of single files as
-painless as possible.
+servefile is a small HTTP-server intended for temporary file transfer mostly
+in the local network. It aims to make transfering single files as painless as
+possible and to replace tar/netcat solutions.
 
-Without any options servefile serves just one file and redirects all HTTP
-requests to that one file.
+With just a file as argument servefile serves just that one file and redirects
+all HTTP requests to that file.
 
 Uploads can be done with curl, wget (see EXAMPLES) or a normal browser.
-In upload mode with \fI\-u\fR servefile creates a directory and saves all
-uploads into that directory. When uploading with curl or wget the filename
-is taken out of the path part of the url used for the upload.
+In upload mode with \fB\-u\fR servefile creates a directory and saves all
+uploaded files into that directory. When uploading with curl or wget the
+filename is extracted from the path part of the url used for the upload.
 
 For SSL support python-openssl (pyssl) needs to be installed. If no key and
 cert is given, servefile will generate a keypair for you and display its
