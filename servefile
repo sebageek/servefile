@@ -370,7 +370,8 @@ class ServeFileException(Exception):
 class ServeFile():
 	""" Main class to manage everything. """
 
-	(MODE_SINGLE, MODE_SINGLETAR, MODE_UPLOAD, MODE_LISTDIR) = range(4)
+	_NUM_MODES = 4
+	(MODE_SINGLE, MODE_SINGLETAR, MODE_UPLOAD, MODE_LISTDIR) = range(_NUM_MODES)
 
 	def __init__(self, target, port=8080, serveMode=0, useSSL=False):
 		self.target = target
@@ -382,7 +383,7 @@ class ServeFile():
 		self.auth = None
 		self.maxUploadSize = 0
 
-		if self.serveMode not in range(3):
+		if self.serveMode not in range(self._NUM_MODES):
 			self.serveMode = None
 			raise ValueError("Unknown serve mode, needs to be MODE_SINGLE, MODE_UPLOAD or MODE_DIRLIST")
 
