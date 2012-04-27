@@ -32,6 +32,12 @@ For SSL support python-openssl (pyssl) needs to be installed. If no key and
 cert is given, servefile will generate a keypair for you and display its
 fingerprint.
 
+In \fB--tar\fR mode the given file or directory will be on the fly and on
+request packed and, through the HTTP connection, piped to the client. Tar files
+will be created only containing the top directory given to servefile, so using
+path/to/dir/ as \fIfile/directory\fR argument will create a tar file starting
+with the dir/ directory. Symlinks will not be dereferenced.
+
 .SH COMMAND SUMMARY
 .SS "positional arguments:"
 .TP
@@ -72,6 +78,15 @@ Certfile to use for SSL
 .TP
 \fB\-a\fR user:password, \fB\-\-auth\fR user:password
 Set user and password for HTTP basic authentication
+.TP
+\fB\-t\fR, \fB\-\-tar\fR
+Enable on the fly tar creation for given file or
+directory. Note: Download continuation will not be
+available.
+.TP
+\fB\-c\fR method, \fB\-\-compression\fR method
+Set compression method, only in combination with
+\fB\-\-tar\fR. Can be one of none, gzip, bzip2.
 .SH EXAMPLES
 Serving a single file with SSL and HTTP Basic auth:
 .IP
@@ -86,6 +101,10 @@ Uploading file foo as bar to servefile via command line:
        curl \-X PUT http://ip:port/bar \-d @foo 
        curl \-X POST http://ip:port/bar \-d @foo 
        wget http://ip:port/bar \-\-post-file=foo
+.PP
+serving a on the fly generated tar.gz file of a directory:
+.IP
+servefile --tar -c gzip path/to/dir
 .PP
 .SH AUTHOR
 servefile is developed by Sebastian Lohff <seba@someserver.de>
