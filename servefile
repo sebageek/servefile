@@ -174,12 +174,23 @@ class TarFileHandler(FileBaseHandler):
 			cmd = ["tar", "-cj"]
 		else:
 			raise ValueError("Unknown compression mode '%s'" % self.compression)
+
 		dirname = os.path.basename(self.target.rstrip("/"))
 		chdirTo = os.path.dirname(self.target.rstrip("/"))
 		if chdirTo != '':
 			cmd.extend(["-C", chdirTo])
 		cmd.append(dirname)
 		return cmd
+
+	@staticmethod
+	def getCompressionExt():
+		if TarFileHandler.compression == "none":
+			return ".tar"
+		elif TarFileHandler.compression == "gzip":
+			return ".tar.gz"
+		elif TarFileHandler.compression == "bzip2":
+			return ".tar.bz2"
+		raise ValueError("Unknown compression mode '%s'" % self.compression)
 
 class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
 	""" Simple HTTP Server which allows uploading to a specified directory
@@ -545,7 +556,7 @@ class ServeFile():
 			if not os.path.exists(self.realTarget):
 				raise ServeFileException("Error: Could not open file or directory")
 			TarFileHandler.target = self.realTarget
-			TarFileHandler.fileName = os.path.basename(self.realTarget.rstrip("/"))
+			TarFileHandler.fileName = os.path.basename(self.realTarget.rstrip("/")) + TarFileHandler.getCompressionExt()
 
 			handler = TarFileHandler
 		elif self.serveMode == self.MODE_UPLOAD:
