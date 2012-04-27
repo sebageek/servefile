@@ -39,6 +39,8 @@ def getDateStrNow():
 
 class FileBaseHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 	fileName = "Undefined"
+	blockSize = 1024 * 1024
+
 	def checkAndDoRedirect(self):
 		""" If request didn't request self.fileName redirect to self.fileName.
 
@@ -54,7 +56,6 @@ class FileHandler(FileBaseHandler):
 	filePath = "/dev/null"
 	fileLength = 0
 	startTime = getDateStrNow()
-	blockSize = 1024 * 1024
 
 	def do_HEAD(self):
 		if self.checkAndDoRedirect():
@@ -120,6 +121,65 @@ class FileHandler(FileBaseHandler):
 		else:
 			readsize = self.blockSize
 		return myfile.read(readsize)
+
+class TarFileHandler(FileBaseHandler):
+	target = None
+	compression = "none"
+	compressionMethods = ("none", "gzip", "bzip2")
+
+	def do_HEAD(self):
+		if self.checkAndDoRedirect():
+			return
+		self.send_response(200)
+		self.send_header('Last-Modified', getDateStrNow())
+		self.send_header('Content-Type', 'application/octet-stream')
+		self.send_header('Content-Disposition', 'attachment; filename="%s"' % self.fileName)
+		self.end_headers()
+
+	def do_GET(self):
+		if self.checkAndDoRedirect():
+			return
+
+		tarCmd = Popen(self.getCompressionCmd(), stdout=PIPE)
+		# give the process a short time to find out if it can
+		# pack/compress the file
+		time.sleep(0.05)
+		if tarCmd.poll() != None and tarCmd.poll() != 0:
+			# something went wrong
+			print "Error while compressing '%s'. Aborting request." % self.target
+			self.send_response(500)
+			self.end_headers()
+			return
+
+		self.send_response(200)
+		self.send_header('Last-Modified', getDateStrNow())
+		self.send_header('Content-Type', 'application/octet-stream')
+		self.end_headers()
+
+		block = True
+		while block and block != '':
+			block = tarCmd.stdout.read(self.blockSize)
+			if block and block != '':
+				self.wfile.write(block)
+
+	def getCompressionCmd(self):
+		if self.compression == "none":
+			self.fileName += ".tar"
+			cmd = ["tar", "-c"]
+		elif self.compression == "gzip":
+			self.fileName += ".tar.gz"
+			cmd = ["tar", "-cz"]
+		elif self.compression == "bzip2":
+			self.fileName += ".tar.bz2"
+			cmd = ["tar", "-cj"]
+		else:
+			raise ValueError("Unknown compression mode '%s'" % self.compression)
+		dirname = os.path.basename(self.target.rstrip("/"))
+		chdirTo = os.path.dirname(self.target.rstrip("/"))
+		if chdirTo != '':
+			cmd.extend(["-C", chdirTo])
+		cmd.append(dirname)
+		return cmd
 
 class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
 	""" Simple HTTP Server which allows uploading to a specified directory
@@ -310,7 +370,7 @@ class ServeFileException(Exception):
 class ServeFile():
 	""" Main class to manage everything. """
 
-	(MODE_SINGLE, MODE_UPLOAD, MODE_LISTDIR) = range(3)
+	(MODE_SINGLE, MODE_SINGLETAR, MODE_UPLOAD, MODE_LISTDIR) = range(4)
 
 	def __init__(self, target, port=8080, serveMode=0, useSSL=False):
 		self.target = target
@@ -365,6 +425,14 @@ class ServeFile():
 	def setMaxUploadSize(self, limit):
 		""" Set the maximum upload size in byte """
 		self.maxUploadSize = limit
+
+	def setCompression(self, compression):
+		""" Set the compression of TarFileHandler """
+		if self.serveMode != self.MODE_SINGLETAR:
+			raise ServeFileException("Compression mode can only be set in tar-mode")
+		if compression not in TarFileHandler.compressionMethods:
+			raise ServeFileException("Compression mode not available")
+		TarFileHandler.compression = compression
 
 	def genKeyPair(self):
 		print "Generating SSL certificate...",
@@ -471,6 +539,11 @@ class ServeFile():
 			except IOError:
 				raise ServeFileException("Error: Could not open file!")
 			handler = FileHandler
+		elif self.serveMode == self.MODE_SINGLETAR:
+			TarFileHandler.target = self.target
+			TarFileHandler.fileName = os.path.basename(self.target.rstrip("/"))
+
+			handler = TarFileHandler
 		elif self.serveMode == self.MODE_UPLOAD:
 			if os.path.isdir(self.target):
 				print "Warning: Uploading to an already existing directory"
@@ -560,6 +633,11 @@ def main():
 	                    help="Certfile to use for SSL")
 	parser.add_argument('-a', '--auth', type=str, metavar='user:password', \
 	                    help="Set user and password for HTTP basic authentication")
+	parser.add_argument('-t', '--tar', action="store_true", default=False, \
+	                    help="Enable on the fly tar creation for given file or directory. Note: Download continuation will not be available.")
+	parser.add_argument('-c', '--compression', type=str, metavar='method', \
+	                    default="none", \
+	                    help="Set compression method, only in combination with --tar. Can be one of %s." % ", ".join(TarFileHandler.compressionMethods))
 	
 	args = parser.parse_args()
 	maxUploadSize = 0
@@ -600,11 +678,33 @@ def main():
 			print "Error: User and password for HTTP basic auth need to be both at least one character long and have to be seperated by a \":\""
 			sys.exit(1)
 
+	if args.compression != "none" and not args.tar:
+		print "Error: Please specify --tar if you want to tar everything"
+		sys.exit(1)
+
+	if args.tar and args.upload:
+		print "Error: --tar mode will not work with uploads"
+		sys.exit(1)
+
+	if args.tar and args.list_dir:
+		print "Error: --tar mode will not work with directory listings"
+		sys.exit(1)
+
+	compression = None
+	if args.compression:
+		if args.compression in TarFileHandler.compressionMethods:
+			compression = args.compression
+		else:
+			print "Error: Compression mode '%s' is unknown" % self.compression
+			sys.exit(1)
+
 	mode = None
 	if args.upload:
 		mode = ServeFile.MODE_UPLOAD
 	elif args.list_dir:
 		mode = ServeFile.MODE_LISTDIR
+	elif args.tar:
+		mode = ServeFile.MODE_SINGLETAR
 	else:
 		mode = ServeFile.MODE_SINGLE
 
@@ -619,6 +719,8 @@ def main():
 		if args.auth:
 			user, password = args.auth.split(":", 1)
 			server.setAuth(user, password)
+		if compression and compression != "none":
+			server.setCompression(compression)
 		server.serve()
 	except ServeFileException, e:
 		print e
