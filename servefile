@@ -638,7 +638,7 @@ def main():
 	parser.add_argument('-u', '--upload', action="store_true", default=False, \
 	                    help="Enable uploads to a given directory")
 	parser.add_argument('-s', '--max-upload-size', type=str, \
-	                    help="Limit uploadsize in kb. Size modifiers are allowed, e.g. 2G, 12Mb, 1b.")
+	                    help="Limit upload size in kB. Size modifiers are allowed, e.g. 2G, 12MB, 1B.")
 	parser.add_argument('-l', '--list-dir', action="store_true", default=False, \
 	                    help="Show directory indexes and allow access to all subdirectories")
 	parser.add_argument('--ssl', action="store_true", default=False, \
