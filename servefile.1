@@ -12,7 +12,7 @@ servefile \- small HTTP-Server for temporary file transfer
 
 .SH DISCLAIMER
 Do not use this as a normal webserver. This server is optimized for running
-a short time and to send files to other people, not for doing performant
+a short time and to send files to other people, not for doing high-performance
 static file serving.
 
 .SH DESCRIPTION
@@ -32,11 +32,13 @@ For SSL support python-openssl (pyssl) needs to be installed. If no key and
 cert is given, servefile will generate a keypair for you and display its
 fingerprint.
 
-In \fB--tar\fR mode the given file or directory will be on the fly and on
-request packed and, through the HTTP connection, piped to the client. Tar files
-will be created only containing the top directory given to servefile, so using
-path/to/dir/ as \fIfile/directory\fR argument will create a tar file starting
-with the dir/ directory. Symlinks will not be dereferenced.
+In \fB--tar\fR mode the given file or directory will be packed on (each)
+request and piped to the client through the HTTP connection. Tar files
+will be created containing only the lowest directory name from the full path,
+so using /path/to/dir/ as \fIfile/directory\fR argument will create a tar
+file starting with the dir/ directory. When giving a file as argument, only
+the file without any path will be in the tar.
+Symlinks will not be dereferenced.
 
 .SH COMMAND SUMMARY
 .SS "positional arguments:"
