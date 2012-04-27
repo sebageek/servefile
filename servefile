@@ -541,10 +541,11 @@ class ServeFile():
 				raise ServeFileException("Error: Could not open file!")
 			handler = FileHandler
 		elif self.serveMode == self.MODE_SINGLETAR:
-			if not os.path.exists(self.target):
+			self.realTarget = os.path.realpath(self.target)
+			if not os.path.exists(self.realTarget):
 				raise ServeFileException("Error: Could not open file or directory")
-			TarFileHandler.target = self.target
-			TarFileHandler.fileName = os.path.basename(self.target.rstrip("/"))
+			TarFileHandler.target = self.realTarget
+			TarFileHandler.fileName = os.path.basename(self.realTarget.rstrip("/"))
 
 			handler = TarFileHandler
 		elif self.serveMode == self.MODE_UPLOAD:
