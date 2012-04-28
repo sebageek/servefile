@@ -71,7 +71,7 @@ class FileHandler(FileBaseHandler):
 		if self.checkAndDoRedirect():
 			return
 		myfile = open(self.filePath, 'rb')
-		
+
 		# find out if this is a continuing download
 		fromto = None
 		if "Range" in self.headers:
@@ -91,7 +91,7 @@ class FileHandler(FileBaseHandler):
 						return
 					# now we can wind the file *brrrrrr*
 					myfile.seek(fromto[0])
-		
+
 		if fromto != None:
 			self.send_response(216)
 			self.send_header('Content-Range', 'bytes %s-%s/%s' % (fromto[0], fromto[1], self.fileLength))
@@ -114,7 +114,7 @@ class FileHandler(FileBaseHandler):
 		myfile.close()
 		print "%s finished downloading" % (self.client_address[0])
 		return
-	
+
 	def getChunk(self, myfile, fromto):
 		if fromto and myfile.tell()+self.blockSize >= fromto[1]:
 			readsize = fromto[1]-myfile.tell()+1
@@ -249,7 +249,7 @@ class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
 			self.sendResponse(400, "Filename was empty or invalid")
 			return
 
-		# write file down to disk, send an 
+		# write file down to disk, send an
 		target = open(destFileName, "w")
 		target.write(fstorage["file"].file.read(length))
 		target.close()
@@ -316,7 +316,7 @@ class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
 		""" Generate a clean and secure filename.
 
 		This function takes a filename and strips all the slashes out of it.
-		If the file already exists in the target directory, a (NUM) will be 
+		If the file already exists in the target directory, a (NUM) will be
 		appended, so no file will be overwritten.
 		"""
 		cleanFileName = fname.replace("/", "")
@@ -489,13 +489,13 @@ class ServeFile():
 		print "done."
 		print "SHA1 fingerprint:", cert.digest("sha1")
 		print "MD5  fingerprint:", cert.digest("md5")
-	
+
 	def _getCert(self):
 		return self.cert
 
 	def _getKey(self):
 		return self.key
-	
+
 	def setAuth(self, user, password):
 		if len(user) == "" or len(password) == "":
 			raise ServeFileException("User and password both need to be at least one character long")
@@ -580,7 +580,7 @@ class ServeFile():
 			except OSError:
 				raise ServeFileException("Error: Could not change directory to '%s'" % self.target)
 			handler = SimpleHTTPServer.SimpleHTTPRequestHandler
-			
+
 
 		if self.auth:
 			# do authentication
@@ -654,7 +654,7 @@ def main():
 	parser.add_argument('-c', '--compression', type=str, metavar='method', \
 	                    default="none", \
 	                    help="Set compression method, only in combination with --tar. Can be one of %s." % ", ".join(TarFileHandler.compressionMethods))
-	
+
 	args = parser.parse_args()
 	maxUploadSize = 0
 
@@ -742,7 +742,7 @@ def main():
 		print e
 		sys.exit(1)
 	print "Good bye.."
-	
+
 if __name__ == '__main__':
 	main()
 
