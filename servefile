@@ -161,6 +161,7 @@ class TarFileHandler(FileBaseHandler):
 			block = tarCmd.stdout.read(self.blockSize)
 			if block and block != '':
 				self.wfile.write(block)
+		print "%s finished downloading" % (self.client_address[0])
 
 	def getCompressionCmd(self):
 		if self.compression == "none":
