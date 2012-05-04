@@ -1,2 +1,2 @@
-include changelog
+include ChangeLog
 include servefile.1

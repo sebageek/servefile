@@ -1,7 +1,17 @@
 servefile changelog
 ===================
 
-2012-04-27 v0.4.0
+2012-05-04 v0.4.1
+-----------------
+
+	0.4.1 released
+
+	* tar + compression feature
+	* compression
+	* shows fingerprint for self generated certs
+	* added manpage
+
+2012-04-16 v0.4.0
 -----------------
 
 	0.4.0 released

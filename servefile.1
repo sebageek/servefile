@@ -1,4 +1,4 @@
-.TH SERVEFILE "20" "April 2012" "servefile 0.4.0" "User Commands"
+.TH SERVEFILE "20" "April 2012" "servefile 0.4.1" "User Commands"
 
 .SH NAME
 servefile \- small HTTP-Server for temporary file transfer
@@ -105,9 +105,9 @@ Uploading file foo as bar to servefile via command line:
        curl \-X POST http://ip:port/bar \-d @foo 
        wget http://ip:port/bar \-\-post-file=foo
 .PP
-serving a on the fly generated tar.gz file of a directory:
+Serving a on the fly generated tar.gz file of a directory:
 .IP
-servefile --tar -c gzip path/to/dir
+servefile \-\-tar \-c gzip path/to/dir
 .PP
 .SH AUTHOR
 servefile is developed by Sebastian Lohff <seba@someserver.de>
