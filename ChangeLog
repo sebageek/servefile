@@ -1,0 +1,22 @@
+servefile changelog
+===================
+
+2012-04-27 v0.4.0
+-----------------
+
+	0.4.0 released
+
+	* SSL capabilities
+	* Automatic creation of self signed certificates
+	* HTTP basic auth
+	* HEAD support
+	* POST/Multipart upload support
+	* PUT/POST upload support
+
+2012-04-05 v0.3.2
+-----------------
+	
+	0.3.2 released
+
+	* argparse
+
