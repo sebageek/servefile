@@ -253,7 +253,8 @@ class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
 		target = open(destFileName, "w")
 		target.write(fstorage["file"].file.read(length))
 		target.close()
-		self.sendResponse(200, "OK!")
+		self.sendResponse(200, "OK! Thanks for uploading")
+		print "Received file '%s' from %s." % (destFileName, self.client_address[0])
 
 	def do_PUT(self, fromPost=False):
 		""" Upload a file via PUT
