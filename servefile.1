@@ -33,11 +33,12 @@ cert is given, servefile will generate a key pair for you and display its
 fingerprint.
 
 In \fB--tar\fR mode the given file or directory will be packed on (each)
-request and piped to the client through the HTTP connection. Tar files
-will be created containing only the lowest directory name from the full path,
-so using /path/to/dir/ as \fIfile/directory\fR argument will create a tar
-file starting with the dir/ directory. When giving a file as argument, only
-the file without any path will be in the tar.
+request and piped to the client through the HTTP connection, thus serving
+always the latest content of the directory and preventing temporary file
+creaton. Tar files will be created containing only the lowest directory name
+from the full path, so using /path/to/dir/ as \fIfile/directory\fR argument
+will create a tar file starting with the dir/ directory. When giving a file
+as argument, only the file without any path will be in the tarfile.
 Symlinks will not be dereferenced.
 
 .SH COMMAND SUMMARY
@@ -48,7 +49,7 @@ file or directory (with \fB\-l\fR or  \fB\-u\fR) which should be served or uploa
 .SS "optional arguments:"
 .TP
 \fB\-h\fR, \fB\-\-help\fR
-Show this help message and exit
+Show a help message and exit
 .TP
 \fB\-\-version\fR
 Show program's version number and exit
