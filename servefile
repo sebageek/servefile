@@ -40,6 +40,7 @@ def getDateStrNow():
 class FileBaseHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 	fileName = "Undefined"
 	blockSize = 1024 * 1024
+	server_version = "servefile/" + __version__
 
 	def checkAndDoRedirect(self):
 		""" If request didn't request self.fileName redirect to self.fileName.
@@ -126,6 +127,7 @@ class TarFileHandler(FileBaseHandler):
 	target = None
 	compression = "none"
 	compressionMethods = ("none", "gzip", "bzip2")
+	server_version = "servefile/" + __version__
 
 	def do_HEAD(self):
 		if self.checkAndDoRedirect():
