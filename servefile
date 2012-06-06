@@ -68,6 +68,43 @@ class FileBaseHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 		self.send_header('Content-Disposition', 'attachment; filename="%s"' % fileName)
 		self.send_header('Content-Transfer-Encoding', 'binary')
 
+	def isRangeRequest(self):
+		return "Range" in self.headers
+
+	def handleRangeRequest(self, fileLength):
+		""" Find out and handle continuing downloads.
+
+		Returns a tuple of a boolean, if this is a valid range request,
+		and a range. When the requested range is out of range, range is
+		set to None.
+		"""
+		fromto = None
+		if self.isRangeRequest():
+			cont = self.headers.get("Range").split("=")
+			if len(cont) > 1 and cont[0] == 'bytes':
+				fromto = cont[1].split('-')
+				if len(fromto) > 1:
+					if fromto[1] == '':
+						fromto[1] = fileLength - 1
+					try:
+						fromto[0] = int(fromto[0])
+						fromto[1] = int(fromto[1])
+					except:
+						return (False, None)
+
+					if fromto[0] >= fileLength or fromto[0] < 0 or fromto[1] >= fileLength or fromto[1]-fromto[0] < 0:
+						# oops, already done! (requested range out of range)
+						self.send_response(416)
+						self.send_header('Content-Range', 'bytes */%s' % fileLength)
+						self.end_headers()
+						return (True, None)
+					return (True, fromto)
+					# now we can wind the file *brrrrrr*
+					myfile.seek(fromto[0])
+		# broken request or no range header
+			pass
+		return (False, None)
+
 class FileHandler(FileBaseHandler):
 	filePath = "/dev/null"
 	fileLength = 0
@@ -85,25 +122,14 @@ class FileHandler(FileBaseHandler):
 			return
 		myfile = open(self.filePath, 'rb')
 
-		# find out if this is a continuing download
-		fromto = None
-		if "Range" in self.headers:
-			cont = self.headers.get("Range").split("=")
-			if len(cont) > 1 and cont[0] == 'bytes':
-				fromto = cont[1].split('-')
-				if len(fromto) > 1:
-					if fromto[1] == '':
-						fromto[1] = self.fileLength-1
-					fromto[0] = int(fromto[0])
-					fromto[1] = int(fromto[1])
-					if fromto[0] >= self.fileLength or fromto[0] < 0 or fromto[1] >= self.fileLength or fromto[1]-fromto[0] < 0:
-						# oops, already done!
-						self.send_response(416)
-						self.send_header('Content-Range', 'bytes */%s' % self.fileLength)
-						self.end_headers()
-						return
-					# now we can wind the file *brrrrrr*
-					myfile.seek(fromto[0])
+		(continueDownload, fromto) = self.handleRangeRequest(self.fileLength)
+		if continueDownload:
+			if not fromto:
+				# we are done
+				return
+
+			# now we can wind the file *brrrrrr*
+			myfile.seek(fromto[0])
 
 		fileLength = self.fileLength
 		if fromto != None:
@@ -124,7 +150,6 @@ class FileHandler(FileBaseHandler):
 			block = self.getChunk(myfile, fromto)
 		myfile.close()
 		print "%s finished downloading" % (self.client_address[0])
-		return
 
 	def getChunk(self, myfile, fromto):
 		if fromto and myfile.tell()+self.blockSize >= fromto[1]:
