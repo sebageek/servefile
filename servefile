@@ -11,12 +11,10 @@ import argparse
 import base64
 import cgi
 import BaseHTTPServer
-import commands
 import datetime
 import urllib
 import os
 import re
-import SimpleHTTPServer
 import SocketServer
 import socket
 from stat import ST_SIZE
@@ -42,13 +40,15 @@ class FileBaseHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 	blockSize = 1024 * 1024
 	server_version = "servefile/" + __version__
 
-	def checkAndDoRedirect(self):
+	def checkAndDoRedirect(self, fileName=None):
 		""" If request didn't request self.fileName redirect to self.fileName.
 
 		Returns True if a redirect was issued. """
-		if urllib.unquote(self.path) != "/" + self.fileName:
+		if not fileName:
+			fileName = self.fileName
+		if urllib.unquote(self.path) != "/" + fileName:
 			self.send_response(302)
-			self.send_header('Location', '/' + self.fileName)
+			self.send_header('Location', '/' + fileName)
 			self.end_headers()
 			return True
 		return False
@@ -99,8 +99,6 @@ class FileBaseHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 						self.end_headers()
 						return (True, None)
 					return (True, fromto)
-					# now we can wind the file *brrrrrr*
-					myfile.seek(fromto[0])
 		# broken request or no range header
 			pass
 		return (False, None)
@@ -225,7 +223,7 @@ class TarFileHandler(FileBaseHandler):
 			return ".tar.gz"
 		elif TarFileHandler.compression == "bzip2":
 			return ".tar.bz2"
-		raise ValueError("Unknown compression mode '%s'." % self.compression)
+		raise ValueError("Unknown compression mode '%s'." % TarFileHandler.compression)
 
 class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
 	""" Simple HTTP Server which allows uploading to a specified directory
@@ -747,7 +745,7 @@ def main():
 		if args.compression in TarFileHandler.compressionMethods:
 			compression = args.compression
 		else:
-			print "Error: Compression mode '%s' is unknown." % self.compression
+			print "Error: Compression mode '%s' is unknown." % TarFileHandler.compression
 			sys.exit(1)
 
 	mode = None
