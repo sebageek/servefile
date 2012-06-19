@@ -101,8 +101,103 @@ class FileBaseHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 						return (True, None)
 					return (True, fromto)
 		# broken request or no range header
-			pass
 		return (False, None)
+
+	def sendFile(self, filePath, fileLength=None, lastModified=None):
+		""" Send file with continuation support.
+
+		filePath: path to file to be sent
+		fileLength: length of file (if None is given this will be found out)
+		lastModified: time the file was last modified, None for "now"
+		"""
+		if not fileLength:
+			fileLength = os.stat(filePath)[ST_SIZE]
+
+		(responseCode, myfile) = self.getFileHandle(filePath)
+		if not myfile:
+			self.send_response(responseCode)
+			self.end_headers()
+			return
+
+		(continueDownload, fromto) = self.handleRangeRequest(fileLength)
+		if continueDownload:
+			if not fromto:
+				# we are done
+				return True
+
+			# now we can wind the file *brrrrrr*
+			myfile.seek(fromto[0])
+
+		if fromto != None:
+			self.send_response(216)
+			self.send_header('Content-Range', 'bytes %s-%s/%s' % (fromto[0], fromto[1], fileLength))
+			fileLength = fromto[1] - fromto[0] + 1
+		else:
+			self.send_response(200)
+
+		fileName = self.fileName
+		if not fileName:
+			fileName = os.path.basename(filePath)
+		self.sendContentHeaders(fileName, fileLength, lastModified)
+		self.end_headers()
+		block = self.getChunk(myfile, fromto)
+		while block:
+			try:
+				self.wfile.write(block)
+			except socket.error, e:
+				print "%s ABORTED transmission (Reason %s: %s)" % (self.client_address[0], e[0], e[1])
+				return False
+			block = self.getChunk(myfile, fromto)
+		myfile.close()
+		print "%s finished downloading %s" % (self.client_address[0], filePath)
+		return True
+
+	def getChunk(self, myfile, fromto):
+		if fromto and myfile.tell()+self.blockSize >= fromto[1]:
+			readsize = fromto[1]-myfile.tell()+1
+		else:
+			readsize = self.blockSize
+		return myfile.read(readsize)
+
+	def getFileHandle(self, path):
+		""" Get handle to a file.
+
+		Return a tuple of HTTP response code and file handle.
+		If the handle couldn't be acquired it is set to None
+		and an appropriate HTTP error code is returned.
+		"""
+		myfile = None
+		responseCode = 200
+		try:
+			myfile = open(path, 'rb')
+		except IOError, e:
+			responseCode = self.getResponseForErrno(e.errno)
+		return (responseCode, myfile)
+
+	def getFileLength(self, path):
+		""" Get length of a file.
+
+		Return a tuple of HTTP response code and file length.
+		If filelength couldn't be determined, it is set to -1
+		and an appropriate HTTP error code is returned.
+		"""
+		fileSize = -1
+		responseCode = 200
+		try:
+			fileSize = os.stat(path)[ST_SIZE]
+		except IOError, e:
+			responseCode = self.getResponseForErrno(e.errno)
+		return (responseCode, fileSize)
+
+	def getResponseForErrno(self, errno):
+		""" Return HTTP response code for an IOError errno """
+		if errno == 2:
+			return 404
+		elif errno == 13:
+			return 403
+		else:
+			return 500
+
 
 class FileHandler(FileBaseHandler):
 	filePath = "/dev/null"
@@ -119,43 +214,8 @@ class FileHandler(FileBaseHandler):
 	def do_GET(self):
 		if self.checkAndDoRedirect():
 			return
-		myfile = open(self.filePath, 'rb')
+		self.sendFile(self.filePath, self.fileLength, self.startTime)
 
-		(continueDownload, fromto) = self.handleRangeRequest(self.fileLength)
-		if continueDownload:
-			if not fromto:
-				# we are done
-				return
-
-			# now we can wind the file *brrrrrr*
-			myfile.seek(fromto[0])
-
-		fileLength = self.fileLength
-		if fromto != None:
-			self.send_response(216)
-			self.send_header('Content-Range', 'bytes %s-%s/%s' % (fromto[0], fromto[1], self.fileLength))
-			fileLength = fromto[1] - fromto[0] + 1
-		else:
-			self.send_response(200)
-		self.sendContentHeaders(self.fileName, fileLength, self.startTime)
-		self.end_headers()
-		block = self.getChunk(myfile, fromto)
-		while block:
-			try:
-				self.wfile.write(block)
-			except socket.error, e:
-				print "%s ABORTED transmission (Reason %s: %s)" % (self.client_address[0], e[0], e[1])
-				return
-			block = self.getChunk(myfile, fromto)
-		myfile.close()
-		print "%s finished downloading" % (self.client_address[0])
-
-	def getChunk(self, myfile, fromto):
-		if fromto and myfile.tell()+self.blockSize >= fromto[1]:
-			readsize = fromto[1]-myfile.tell()+1
-		else:
-			readsize = self.blockSize
-		return myfile.read(readsize)
 
 class TarFileHandler(FileBaseHandler):
 	target = None
