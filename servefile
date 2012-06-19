@@ -36,7 +36,7 @@ def getDateStrNow():
 	return now.strftime("%a, %d %b %Y %H:%M:%S GMT")
 
 class FileBaseHandler(BaseHTTPServer.BaseHTTPRequestHandler):
-	fileName = "Undefined"
+	fileName = None
 	blockSize = 1024 * 1024
 	server_version = "servefile/" + __version__
 
@@ -69,6 +69,7 @@ class FileBaseHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 		self.send_header('Content-Transfer-Encoding', 'binary')
 
 	def isRangeRequest(self):
+		""" Return True if partial content is requestet """
 		return "Range" in self.headers
 
 	def handleRangeRequest(self, fileLength):
@@ -383,6 +384,7 @@ def catchSSLErrors(BaseSSLClass):
 					print "%s SSL Error: %s" % (self.client_address[0], e)
 	return X
 
+
 class SecureThreadedHTTPServer(ThreadedHTTPServer):
 	def __init__(self, pubKey, privKey, *args, **kwargs):
 		ThreadedHTTPServer.__init__(self, *args, **kwargs)
@@ -403,6 +405,7 @@ class SecureThreadedHTTPServer(ThreadedHTTPServer):
 	def shutdown_request(self, request):
 		request.shutdown()
 
+
 class SecureHandler():
 	def setup(self):
 		self.connection = self.request
@@ -411,6 +414,7 @@ class SecureHandler():
 
 class ServeFileException(Exception):
 	pass
+
 
 class ServeFile():
 	""" Main class to manage everything. """
@@ -631,6 +635,7 @@ class ServeFile():
 			handler = AlreadySecuredHandler
 		return handler
 
+
 class AuthenticationHandler():
 	# base64 encoded user:password string for authentication
 	authString = None
@@ -662,6 +667,7 @@ class AuthenticationHandler():
 		else:
 			self.send_response(401)
 			self.send_header("WWW-Authenticate", "Basic realm=\"%s\"" % self.realm)
+
 
 def main():
 	parser = argparse.ArgumentParser(description='Serve a single file via HTTP.')
@@ -776,6 +782,7 @@ def main():
 		print e
 		sys.exit(1)
 	print "Good bye."
+
 
 if __name__ == '__main__':
 	main()
