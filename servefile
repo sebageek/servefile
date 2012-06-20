@@ -12,8 +12,10 @@ import base64
 import cgi
 import BaseHTTPServer
 import datetime
+import mimetypes
 import urllib
 import os
+import posixpath
 import re
 import SocketServer
 import socket
@@ -285,6 +287,119 @@ class TarFileHandler(FileBaseHandler):
 		elif TarFileHandler.compression == "bzip2":
 			return ".tar.bz2"
 		raise ValueError("Unknown compression mode '%s'." % TarFileHandler.compression)
+
+
+class DirListingHandler(FileBaseHandler):
+	""" DOCUMENTATION MISSING """
+
+	targetDir = None
+
+	def do_HEAD(self):
+		self.getFileOrDirectory(head=True)
+
+	def do_GET(self):
+		self.getFileOrDirectory(head=False)
+
+	def getFileOrDirectory(self, head=False):
+		path = self.getCleanPath()
+
+		if os.path.isdir(path):
+			if not self.path.endswith('/'):
+				self.send_response(301)
+				self.send_header("Location", self.path + '/')
+				self.end_headers()
+			else:
+				self.sendDirectoryListing(path, head)
+		elif os.path.isfile(path):
+			if head:
+				(response, length) = self.getFileLength(path)
+				if length < 0:
+					self.send_response(response)
+					self.end_headers()
+				else:
+					self.send_response(200)
+					self.sendContentHeaders(self, path, length)
+					self.end_headers()
+			else:
+				self.sendFile(path, head)
+		else:
+			self.send_response(404)
+			self.end_headers()
+
+	def sendDirectoryListing(self, path, head):
+		print "sending directory listing"
+
+		header = """<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<html>
+	<head>
+		<title>Index of %(path)s</title>
+	</head>
+<body>
+	<h1>Index of %(path)s</h1>
+	<table summary="Directory Listing" cellpadding="0" cellspacing="0">
+	<thead><tr><th class="n">Name</th><th class="m">Last Modified</th><th class="s">Size</th><th class="t">Type</th></tr></thead>
+		""" % {'path': posixpath.normpath(urllib.unquote(self.path))}
+		footer = """</table>
+<address>servefile %(version)s</address>
+</body>
+</html>""" % {'version': __version__}
+		content = []
+		for item in [".."] + os.listdir(path):
+				# create path to item
+				itemPath = os.path.join(path, item)
+
+				# try to stat file for size, last modified... continue on error
+				stat = None
+				try:
+					stat = os.stat(itemPath)
+				except IOError:
+					continue
+
+				# Strings to display on directory listing
+				lastModifiedDate = datetime.datetime.fromtimestamp(stat.st_mtime)
+				lastModified = lastModifiedDate.strftime("%Y-%m-%d %H:%M")
+				fileSize = "%.1f%s" % self.convertSize(stat.st_size)
+				(fileType, _) = mimetypes.guess_type(itemPath)
+				if not fileType:
+					fileType = "-"
+
+				if os.path.isdir(itemPath):
+					item += "/"
+					fileType = "Directory"
+				content.append("""
+					<tr>
+						<td><a href="%s">%s</a></td>
+						<td>%s</td>
+						<td>%s</td>
+						<td>%s</td>
+					</tr>
+				""" % (urllib.quote(item), item, lastModified, fileSize, fileType))
+
+		listing = header + "\n".join(content) + footer
+
+		# write listing
+		self.send_response(200)
+		self.send_header("Content-Type", "text/html")
+		if head:
+			self.end_headers()
+			return
+		self.send_header("Content-Length", str(len(listing)))
+		self.end_headers()
+		self.wfile.write(listing)
+
+	def convertSize(self, size):
+		ext = None
+		for ext in "BKMGT":
+			if size < 1024.0:
+				break
+			size /= 1024.0
+		return (size, ext)
+
+	def getCleanPath(self):
+		urlPath = posixpath.normpath(urllib.unquote(self.path)).strip("/")
+		path = os.path.join(self.targetDir, urlPath)
+		return path
+
 
 class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
 	""" Simple HTTP Server which allows uploading to a specified directory
@@ -665,7 +780,7 @@ class ServeFile():
 				self.dirCreated = True
 				try:
 					os.mkdir(self.target)
-				except IOError, OSError:
+				except (IOError, OSError):
 					raise ServeFileException("Error: Could not create directory '%s' for uploads." % (self.target,) )
 			else:
 				raise ServeFileException("Error: Upload directory already exists and is a file.")
@@ -673,12 +788,8 @@ class ServeFile():
 			FilePutter.maxUploadSize = self.maxUploadSize
 			handler = FilePutter
 		elif self.serveMode == self.MODE_LISTDIR:
-			try:
-				os.chdir(self.target)
-			except OSError:
-				raise ServeFileException("Error: Could not change directory to '%s'." % self.target)
-			handler = SimpleHTTPServer.SimpleHTTPRequestHandler
-
+			handler = DirListingHandler
+			handler.targetDir = self.target
 
 		if self.auth:
 			# do authentication
