@@ -101,8 +101,8 @@ servefile \-u dir/
 .PP
 Uploading file foo as bar to servefile via command line:
 .PP
-       curl \-X PUT http://ip:port/bar \-d @foo 
-       curl \-X POST http://ip:port/bar \-d @foo 
+       curl \-X PUT http://ip:port/bar \-\-data-binary @foo 
+       curl \-X POST http://ip:port/bar \-\-data-binary @foo 
        wget http://ip:port/bar \-\-post-file=foo
 .PP
 Serving a on the fly generated tar.gz file of a directory:
