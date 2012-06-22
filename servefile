@@ -301,6 +301,7 @@ class DirListingHandler(FileBaseHandler):
 		self.getFileOrDirectory(head=False)
 
 	def getFileOrDirectory(self, head=False):
+		""" Send file or directory index, depending on requested path """
 		path = self.getCleanPath()
 
 		if os.path.isdir(path):
@@ -327,20 +328,36 @@ class DirListingHandler(FileBaseHandler):
 			self.end_headers()
 
 	def sendDirectoryListing(self, path, head):
-		print "sending directory listing"
-
+		""" Generate a directorylisting for path and send it """
 		header = """<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
 <html>
 	<head>
 		<title>Index of %(path)s</title>
+		<style type="text/css">
+			a, a:active {text-decoration: none; color: blue;}
+			a:visited {color: #48468F;}
+			a:hover, a:focus {text-decoration: underline; color: red;}
+
+			body {background-color: #F5F5F5;}
+			h2 {margin-bottom: 12px;}
+			div.list { background-color: white; border-top: 1px solid #646464; border-bottom: 1px solid #646464; padding-top: 10px; padding-bottom: 14px;}
+			table {margin-left: 12px;}
+			td {padding-right: 14px;}
+
+			th, td { font: 90%% monospace; text-align: left;}
+			th { font-weight: bold; padding-right: 14px; padding-bottom: 3px;}
+			td.s, th.s {text-align: right;}
+			div.foot { font: 90%% monospace; color: #787878; padding-top: 4px;
+		</style>
 	</head>
 <body>
-	<h1>Index of %(path)s</h1>
+	<h2>Index of %(path)s</h2>
+	<div class="list">
 	<table summary="Directory Listing" cellpadding="0" cellspacing="0">
 	<thead><tr><th class="n">Name</th><th class="m">Last Modified</th><th class="s">Size</th><th class="t">Type</th></tr></thead>
 		""" % {'path': posixpath.normpath(urllib.unquote(self.path))}
-		footer = """</table>
-<address>servefile %(version)s</address>
+		footer = """</table></div>
+<div class="foot"><address>servefile %(version)s</address></div>
 </body>
 </html>""" % {'version': __version__}
 		content = []
@@ -368,10 +385,10 @@ class DirListingHandler(FileBaseHandler):
 					fileType = "Directory"
 				content.append("""
 					<tr>
-						<td><a href="%s">%s</a></td>
-						<td>%s</td>
-						<td>%s</td>
-						<td>%s</td>
+						<td class="n"><a href="%s">%s</a></td>
+						<td class="m">%s</td>
+						<td class="s">%s</td>
+						<td class="t">%s</td>
 					</tr>
 				""" % (urllib.quote(item), item, lastModified, fileSize, fileType))
 
