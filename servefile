@@ -11,12 +11,12 @@ import argparse
 import base64
 import cgi
 import BaseHTTPServer
-import commands
 import datetime
+import mimetypes
 import urllib
 import os
+import posixpath
 import re
-import SimpleHTTPServer
 import SocketServer
 import socket
 from stat import ST_SIZE
@@ -38,20 +38,168 @@ def getDateStrNow():
 	return now.strftime("%a, %d %b %Y %H:%M:%S GMT")
 
 class FileBaseHandler(BaseHTTPServer.BaseHTTPRequestHandler):
-	fileName = "Undefined"
+	fileName = None
 	blockSize = 1024 * 1024
 	server_version = "servefile/" + __version__
 
-	def checkAndDoRedirect(self):
+	def checkAndDoRedirect(self, fileName=None):
 		""" If request didn't request self.fileName redirect to self.fileName.
 
 		Returns True if a redirect was issued. """
-		if urllib.unquote(self.path) != "/" + self.fileName:
+		if not fileName:
+			fileName = self.fileName
+		if urllib.unquote(self.path) != "/" + fileName:
 			self.send_response(302)
-			self.send_header('Location', '/' + self.fileName)
+			self.send_header('Location', '/' + fileName)
 			self.end_headers()
 			return True
 		return False
+
+	def sendContentHeaders(self, fileName, fileLength, lastModified=None):
+		""" Send default Content headers for given fileName and fileLength.
+
+		If no lastModified is given the current date is taken. If
+		fileLength is lesser than 0 no Content-Length will be sent."""
+		if not lastModified:
+			lastModified = getDateStrNow()
+
+		if fileLength >= 0:
+			self.send_header('Content-Length', str(fileLength))
+		self.send_header('Last-Modified', lastModified)
+		self.send_header('Content-Type', 'application/octet-stream')
+		self.send_header('Content-Disposition', 'attachment; filename="%s"' % fileName)
+		self.send_header('Content-Transfer-Encoding', 'binary')
+
+	def isRangeRequest(self):
+		""" Return True if partial content is requestet """
+		return "Range" in self.headers
+
+	def handleRangeRequest(self, fileLength):
+		""" Find out and handle continuing downloads.
+
+		Returns a tuple of a boolean, if this is a valid range request,
+		and a range. When the requested range is out of range, range is
+		set to None.
+		"""
+		fromto = None
+		if self.isRangeRequest():
+			cont = self.headers.get("Range").split("=")
+			if len(cont) > 1 and cont[0] == 'bytes':
+				fromto = cont[1].split('-')
+				if len(fromto) > 1:
+					if fromto[1] == '':
+						fromto[1] = fileLength - 1
+					try:
+						fromto[0] = int(fromto[0])
+						fromto[1] = int(fromto[1])
+					except:
+						return (False, None)
+
+					if fromto[0] >= fileLength or fromto[0] < 0 or fromto[1] >= fileLength or fromto[1]-fromto[0] < 0:
+						# oops, already done! (requested range out of range)
+						self.send_response(416)
+						self.send_header('Content-Range', 'bytes */%s' % fileLength)
+						self.end_headers()
+						return (True, None)
+					return (True, fromto)
+		# broken request or no range header
+		return (False, None)
+
+	def sendFile(self, filePath, fileLength=None, lastModified=None):
+		""" Send file with continuation support.
+
+		filePath: path to file to be sent
+		fileLength: length of file (if None is given this will be found out)
+		lastModified: time the file was last modified, None for "now"
+		"""
+		if not fileLength:
+			fileLength = os.stat(filePath)[ST_SIZE]
+
+		(responseCode, myfile) = self.getFileHandle(filePath)
+		if not myfile:
+			self.send_response(responseCode)
+			self.end_headers()
+			return
+
+		(continueDownload, fromto) = self.handleRangeRequest(fileLength)
+		if continueDownload:
+			if not fromto:
+				# we are done
+				return True
+
+			# now we can wind the file *brrrrrr*
+			myfile.seek(fromto[0])
+
+		if fromto != None:
+			self.send_response(216)
+			self.send_header('Content-Range', 'bytes %s-%s/%s' % (fromto[0], fromto[1], fileLength))
+			fileLength = fromto[1] - fromto[0] + 1
+		else:
+			self.send_response(200)
+
+		fileName = self.fileName
+		if not fileName:
+			fileName = os.path.basename(filePath)
+		self.sendContentHeaders(fileName, fileLength, lastModified)
+		self.end_headers()
+		block = self.getChunk(myfile, fromto)
+		while block:
+			try:
+				self.wfile.write(block)
+			except socket.error, e:
+				print "%s ABORTED transmission (Reason %s: %s)" % (self.client_address[0], e[0], e[1])
+				return False
+			block = self.getChunk(myfile, fromto)
+		myfile.close()
+		print "%s finished downloading %s" % (self.client_address[0], filePath)
+		return True
+
+	def getChunk(self, myfile, fromto):
+		if fromto and myfile.tell()+self.blockSize >= fromto[1]:
+			readsize = fromto[1]-myfile.tell()+1
+		else:
+			readsize = self.blockSize
+		return myfile.read(readsize)
+
+	def getFileHandle(self, path):
+		""" Get handle to a file.
+
+		Return a tuple of HTTP response code and file handle.
+		If the handle couldn't be acquired it is set to None
+		and an appropriate HTTP error code is returned.
+		"""
+		myfile = None
+		responseCode = 200
+		try:
+			myfile = open(path, 'rb')
+		except IOError, e:
+			responseCode = self.getResponseForErrno(e.errno)
+		return (responseCode, myfile)
+
+	def getFileLength(self, path):
+		""" Get length of a file.
+
+		Return a tuple of HTTP response code and file length.
+		If filelength couldn't be determined, it is set to -1
+		and an appropriate HTTP error code is returned.
+		"""
+		fileSize = -1
+		responseCode = 200
+		try:
+			fileSize = os.stat(path)[ST_SIZE]
+		except IOError, e:
+			responseCode = self.getResponseForErrno(e.errno)
+		return (responseCode, fileSize)
+
+	def getResponseForErrno(self, errno):
+		""" Return HTTP response code for an IOError errno """
+		if errno == 2:
+			return 404
+		elif errno == 13:
+			return 403
+		else:
+			return 500
+
 
 class FileHandler(FileBaseHandler):
 	filePath = "/dev/null"
@@ -62,66 +210,14 @@ class FileHandler(FileBaseHandler):
 		if self.checkAndDoRedirect():
 			return
 		self.send_response(200)
-		self.send_header('Content-Length', self.fileLength)
-		self.send_header('Last-Modified', self.startTime)
-		self.send_header('Content-Type', 'application/octet-stream')
-		self.send_header('Content-Disposition', 'attachment; filename="%s"' % self.fileName)
+		self.sendContentHeaders(self.fileName, self.fileLength, self.startTime)
 		self.end_headers()
 
 	def do_GET(self):
 		if self.checkAndDoRedirect():
 			return
-		myfile = open(self.filePath, 'rb')
+		self.sendFile(self.filePath, self.fileLength, self.startTime)
 
-		# find out if this is a continuing download
-		fromto = None
-		if "Range" in self.headers:
-			cont = self.headers.get("Range").split("=")
-			if len(cont) > 1 and cont[0] == 'bytes':
-				fromto = cont[1].split('-')
-				if len(fromto) > 1:
-					if fromto[1] == '':
-						fromto[1] = self.fileLength-1
-					fromto[0] = int(fromto[0])
-					fromto[1] = int(fromto[1])
-					if fromto[0] >= self.fileLength or fromto[0] < 0 or fromto[1] >= self.fileLength or fromto[1]-fromto[0] < 0:
-						# oops, already done!
-						self.send_response(416)
-						self.send_header('Content-Range', 'bytes */%s' % self.fileLength)
-						self.end_headers()
-						return
-					# now we can wind the file *brrrrrr*
-					myfile.seek(fromto[0])
-
-		if fromto != None:
-			self.send_response(216)
-			self.send_header('Content-Range', 'bytes %s-%s/%s' % (fromto[0], fromto[1], self.fileLength))
-			self.send_header('Content-Length', fromto[1]-fromto[0]+1)
-		else:
-			self.send_response(200)
-			self.send_header('Content-Length', self.fileLength)
-		self.send_header('Content-Disposition', 'attachment; filename="%s"' % self.fileName)
-		self.send_header('Content-Type', 'application/octet-stream')
-		self.send_header('Content-Transfer-Encoding', 'binary')
-		self.end_headers()
-		block = self.getChunk(myfile, fromto)
-		while block:
-			try:
-				self.wfile.write(block)
-			except socket.error, e:
-				print "%s ABORTED transmission (Reason %s: %s)" % (self.client_address[0], e[0], e[1])
-				return
-			block = self.getChunk(myfile, fromto)
-		myfile.close()
-		print "%s finished downloading" % (self.client_address[0])
-		return
-
-	def getChunk(self, myfile, fromto):
-		if fromto and myfile.tell()+self.blockSize >= fromto[1]:
-			readsize = fromto[1]-myfile.tell()+1
-		else:
-			readsize = self.blockSize
-		return myfile.read(readsize)
 
 class TarFileHandler(FileBaseHandler):
 	target = None
@@ -133,9 +229,7 @@ class TarFileHandler(FileBaseHandler):
 		if self.checkAndDoRedirect():
 			return
 		self.send_response(200)
-		self.send_header('Last-Modified', getDateStrNow())
-		self.send_header('Content-Type', 'application/octet-stream')
-		self.send_header('Content-Disposition', 'attachment; filename="%s"' % self.fileName)
+		self.sendContentHeaders(self.fileName, -1)
 		self.end_headers()
 
 	def do_GET(self):
@@ -154,8 +248,7 @@ class TarFileHandler(FileBaseHandler):
 			return
 
 		self.send_response(200)
-		self.send_header('Last-Modified', getDateStrNow())
-		self.send_header('Content-Type', 'application/octet-stream')
+		self.sendContentHeaders(self.fileName, -1)
 		self.end_headers()
 
 		block = True
@@ -193,7 +286,143 @@ class TarFileHandler(FileBaseHandler):
 			return ".tar.gz"
 		elif TarFileHandler.compression == "bzip2":
 			return ".tar.bz2"
-		raise ValueError("Unknown compression mode '%s'." % self.compression)
+		raise ValueError("Unknown compression mode '%s'." % TarFileHandler.compression)
+
+
+class DirListingHandler(FileBaseHandler):
+	""" DOCUMENTATION MISSING """
+
+	targetDir = None
+
+	def do_HEAD(self):
+		self.getFileOrDirectory(head=True)
+
+	def do_GET(self):
+		self.getFileOrDirectory(head=False)
+
+	def getFileOrDirectory(self, head=False):
+		""" Send file or directory index, depending on requested path """
+		path = self.getCleanPath()
+
+		if os.path.isdir(path):
+			if not self.path.endswith('/'):
+				self.send_response(301)
+				self.send_header("Location", self.path + '/')
+				self.end_headers()
+			else:
+				self.sendDirectoryListing(path, head)
+		elif os.path.isfile(path):
+			if head:
+				(response, length) = self.getFileLength(path)
+				if length < 0:
+					self.send_response(response)
+					self.end_headers()
+				else:
+					self.send_response(200)
+					self.sendContentHeaders(self, path, length)
+					self.end_headers()
+			else:
+				self.sendFile(path, head)
+		else:
+			self.send_response(404)
+			self.end_headers()
+
+	def sendDirectoryListing(self, path, head):
+		""" Generate a directorylisting for path and send it """
+		header = """<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+		<title>Index of %(path)s</title>
+		<style type="text/css">
+			a { text-decoration: none; color: #0000BB;}
+			a:visited { color: #000066;}
+			a:hover, a:focus, a:active { text-decoration: underline; color: #cc0000; text-indent: 5px; }
+			body { background-color: #eaeaea; padding: 20px 0; margin: 0; font: 400 13px/1.2em Arial, sans-serif; }
+			h1 { margin: 0 10px 12px 10px; font-family: Arial, sans-serif; }
+			div.content { background-color: white; border-color: #ccc; border-width: 1px 0; border-style: solid; padding: 10px 10px 15px 10px; }
+			td { padding-right: 15px; text-align: left; font-family: monospace; }
+			th { font-weight: bold; font-size: 115%%; padding: 0 15px 5px 0; text-align: left; }
+			.size { text-align: right; }
+			.footer { font: 12px monospace; color: #333; margin: 5px 10px 0; }
+			.footer, h1 { text-shadow: 0 1px 0 white; }
+		</style>
+	</head>
+<body>
+	<h1>Index of %(path)s</h1>
+	<div class="content">
+	<table summary="Directory Listing">
+		<thead>
+			<tr>
+				<th class="name">Name</th>
+				<th class="lastModified">Last Modified</th>
+				<th class="size">Size</th>
+				<th class="type">Type</th>
+			</tr>
+		</thead>
+		<tbody>
+		""" % {'path': posixpath.normpath(urllib.unquote(self.path))}
+		footer = """</tbody></table></div>
+<div class="footer">servefile %(version)s</div>
+</body>
+</html>""" % {'version': __version__}
+		content = []
+		for item in [".."] + sorted(os.listdir(path)):
+				# create path to item
+				itemPath = os.path.join(path, item)
+
+				# try to stat file for size, last modified... continue on error
+				stat = None
+				try:
+					stat = os.stat(itemPath)
+				except IOError:
+					continue
+
+				# Strings to display on directory listing
+				lastModifiedDate = datetime.datetime.fromtimestamp(stat.st_mtime)
+				lastModified = lastModifiedDate.strftime("%Y-%m-%d %H:%M")
+				fileSize = "%.1f%s" % self.convertSize(stat.st_size)
+				(fileType, _) = mimetypes.guess_type(itemPath)
+				if not fileType:
+					fileType = "-"
+
+				if os.path.isdir(itemPath):
+					item += "/"
+					fileType = "Directory"
+				content.append("""
+					<tr>
+						<td class="name"><a href="%s">%s</a></td>
+						<td class="last-modified">%s</td>
+						<td class="size">%s</td>
+						<td class="type">%s</td>
+					</tr>
+				""" % (urllib.quote(item), item, lastModified, fileSize, fileType))
+
+		listing = header + "\n".join(content) + footer
+
+		# write listing
+		self.send_response(200)
+		self.send_header("Content-Type", "text/html")
+		if head:
+			self.end_headers()
+			return
+		self.send_header("Content-Length", str(len(listing)))
+		self.end_headers()
+		self.wfile.write(listing)
+
+	def convertSize(self, size):
+		ext = None
+		for ext in "BKMGT":
+			if size < 1024.0:
+				break
+			size /= 1024.0
+		return (size, ext)
+
+	def getCleanPath(self):
+		urlPath = posixpath.normpath(urllib.unquote(self.path)).strip("/")
+		path = os.path.join(self.targetDir, urlPath)
+		return path
+
 
 class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
 	""" Simple HTTP Server which allows uploading to a specified directory
@@ -353,6 +582,7 @@ def catchSSLErrors(BaseSSLClass):
 					print "%s SSL Error: %s" % (self.client_address[0], e)
 	return X
 
+
 class SecureThreadedHTTPServer(ThreadedHTTPServer):
 	def __init__(self, pubKey, privKey, *args, **kwargs):
 		ThreadedHTTPServer.__init__(self, *args, **kwargs)
@@ -373,6 +603,7 @@ class SecureThreadedHTTPServer(ThreadedHTTPServer):
 	def shutdown_request(self, request):
 		request.shutdown()
 
+
 class SecureHandler():
 	def setup(self):
 		self.connection = self.request
@@ -381,6 +612,7 @@ class SecureHandler():
 
 class ServeFileException(Exception):
 	pass
+
 
 class ServeFile():
 	""" Main class to manage everything. """
@@ -571,7 +803,7 @@ class ServeFile():
 				self.dirCreated = True
 				try:
 					os.mkdir(self.target)
-				except IOError, OSError:
+				except (IOError, OSError):
 					raise ServeFileException("Error: Could not create directory '%s' for uploads." % (self.target,) )
 			else:
 				raise ServeFileException("Error: Upload directory already exists and is a file.")
@@ -579,12 +811,8 @@ class ServeFile():
 			FilePutter.maxUploadSize = self.maxUploadSize
 			handler = FilePutter
 		elif self.serveMode == self.MODE_LISTDIR:
-			try:
-				os.chdir(self.target)
-			except OSError:
-				raise ServeFileException("Error: Could not change directory to '%s'." % self.target)
-			handler = SimpleHTTPServer.SimpleHTTPRequestHandler
-
+			handler = DirListingHandler
+			handler.targetDir = self.target
 
 		if self.auth:
 			# do authentication
@@ -600,6 +828,7 @@ class ServeFile():
 				pass
 			handler = AlreadySecuredHandler
 		return handler
+
 
 class AuthenticationHandler():
 	# base64 encoded user:password string for authentication
@@ -632,6 +861,7 @@ class AuthenticationHandler():
 		else:
 			self.send_response(401)
 			self.send_header("WWW-Authenticate", "Basic realm=\"%s\"" % self.realm)
+
 
 def main():
 	parser = argparse.ArgumentParser(description='Serve a single file via HTTP.')
@@ -715,7 +945,7 @@ def main():
 		if args.compression in TarFileHandler.compressionMethods:
 			compression = args.compression
 		else:
-			print "Error: Compression mode '%s' is unknown." % self.compression
+			print "Error: Compression mode '%s' is unknown." % TarFileHandler.compression
 			sys.exit(1)
 
 	mode = None
@@ -746,6 +976,7 @@ def main():
 		print e
 		sys.exit(1)
 	print "Good bye."
+
 
 if __name__ == '__main__':
 	main()
