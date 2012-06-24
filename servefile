@@ -329,35 +329,41 @@ class DirListingHandler(FileBaseHandler):
 
 	def sendDirectoryListing(self, path, head):
 		""" Generate a directorylisting for path and send it """
-		header = """<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+		header = """<!DOCTYPE html>
 <html>
 	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 		<title>Index of %(path)s</title>
 		<style type="text/css">
-			a, a:active {text-decoration: none; color: blue;}
-			a:visited {color: #48468F;}
-			a:hover, a:focus {text-decoration: underline; color: red;}
-
-			body {background-color: #F5F5F5;}
-			h2 {margin-bottom: 12px;}
-			div.list { background-color: white; border-top: 1px solid #646464; border-bottom: 1px solid #646464; padding-top: 10px; padding-bottom: 14px;}
-			table {margin-left: 12px;}
-			td {padding-right: 14px;}
-
-			th, td { font: 90%% monospace; text-align: left;}
-			th { font-weight: bold; padding-right: 14px; padding-bottom: 3px;}
-			td.s, th.s {text-align: right;}
-			div.foot { font: 90%% monospace; color: #787878; padding-top: 4px;
+			a { text-decoration: none; color: #0000BB;}
+			a:visited { color: #000066;}
+			a:hover, a:focus, a:active { text-decoration: underline; color: #cc0000; text-indent: 5px; }
+			body { background-color: #eaeaea; padding: 20px 0; margin: 0; font: 400 13px/1.2em Arial, sans-serif; }
+			h1 { margin: 0 10px 12px 10px; font-family: Arial, sans-serif; }
+			div.content { background-color: white; border-color: #ccc; border-width: 1px 0; border-style: solid; padding: 10px 10px 15px 10px; }
+			td { padding-right: 15px; text-align: left; font-family: monospace; }
+			th { font-weight: bold; font-size: 115%%; padding: 0 15px 5px 0; text-align: left; }
+			.size { text-align: right; }
+			.footer { font: 12px monospace; color: #333; margin: 5px 10px 0; }
+			.footer, h1 { text-shadow: 0 1px 0 white; }
 		</style>
 	</head>
 <body>
-	<h2>Index of %(path)s</h2>
-	<div class="list">
-	<table summary="Directory Listing" cellpadding="0" cellspacing="0">
-	<thead><tr><th class="n">Name</th><th class="m">Last Modified</th><th class="s">Size</th><th class="t">Type</th></tr></thead>
+	<h1>Index of %(path)s</h1>
+	<div class="content">
+	<table summary="Directory Listing">
+		<thead>
+			<tr>
+				<th class="name">Name</th>
+				<th class="lastModified">Last Modified</th>
+				<th class="size">Size</th>
+				<th class="type">Type</th>
+			</tr>
+		</thead>
+		<tbody>
 		""" % {'path': posixpath.normpath(urllib.unquote(self.path))}
-		footer = """</table></div>
-<div class="foot"><address>servefile %(version)s</address></div>
+		footer = """</tbody></table></div>
+<div class="footer">servefile %(version)s</div>
 </body>
 </html>""" % {'version': __version__}
 		content = []
@@ -385,10 +391,10 @@ class DirListingHandler(FileBaseHandler):
 					fileType = "Directory"
 				content.append("""
 					<tr>
-						<td class="n"><a href="%s">%s</a></td>
-						<td class="m">%s</td>
-						<td class="s">%s</td>
-						<td class="t">%s</td>
+						<td class="name"><a href="%s">%s</a></td>
+						<td class="last-modified">%s</td>
+						<td class="size">%s</td>
+						<td class="type">%s</td>
 					</tr>
 				""" % (urllib.quote(item), item, lastModified, fileSize, fileType))
 
