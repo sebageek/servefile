@@ -361,7 +361,7 @@ class DirListingHandler(FileBaseHandler):
 </body>
 </html>""" % {'version': __version__}
 		content = []
-		for item in [".."] + os.listdir(path):
+		for item in [".."] + sorted(os.listdir(path)):
 				# create path to item
 				itemPath = os.path.join(path, item)
 
