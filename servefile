@@ -939,7 +939,7 @@ def main():
 	parser.add_argument('-a', '--auth', type=str, metavar='user:password', \
 	                    help="Set user and password for HTTP basic authentication")
 	parser.add_argument('--realm', type=str, default=None,\
-	                    help="Set the realm for HTTP basic authentication")
+	                    help="Set a realm for HTTP basic authentication")
 	parser.add_argument('-t', '--tar', action="store_true", default=False, \
 	                    help="Enable on the fly tar creation for given file or directory. Note: Download continuation will not be available")
 	parser.add_argument('-c', '--compression', type=str, metavar='method', \
