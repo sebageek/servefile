@@ -756,10 +756,11 @@ class ServeFile():
 	def _getKey(self):
 		return self.key
 
-	def setAuth(self, user, password):
+	def setAuth(self, user, password, realm=None):
 		if len(user) == "" or len(password) == "":
 			raise ServeFileException("User and password both need to be at least one character.")
 		self.auth = base64.b64encode("%s:%s" % (user, password))
+		self.authrealm = realm
 
 	def _createServer(self, handler, withv6=False):
 		ThreadedHTTPServer.address_family = socket.AF_INET
@@ -869,6 +870,8 @@ class ServeFile():
 		if self.auth:
 			# do authentication
 			AuthenticationHandler.authString = self.auth
+			if self.authrealm:
+				AuthenticationHandler.realm = self.authrealm
 			class AuthenticatedHandler(AuthenticationHandler, handler):
 				pass
 			handler = AuthenticatedHandler
@@ -935,6 +938,8 @@ def main():
 	                    help="Certfile to use for SSL")
 	parser.add_argument('-a', '--auth', type=str, metavar='user:password', \
 	                    help="Set user and password for HTTP basic authentication")
+	parser.add_argument('--realm', type=str, default=None,\
+	                    help="Set the realm for HTTP basic authentication")
 	parser.add_argument('-t', '--tar', action="store_true", default=False, \
 	                    help="Enable on the fly tar creation for given file or directory. Note: Download continuation will not be available")
 	parser.add_argument('-c', '--compression', type=str, metavar='method', \
@@ -984,6 +989,10 @@ def main():
 			print "Error: User and password for HTTP basic authentication need to be both at least one character band have to be seperated by a \":\"."
 			sys.exit(1)
 
+	if args.realm and not args.auth:
+		print "You can only specify a realm when HTTP basic authentication is enabled."
+		sys.exit(1)
+
 	if args.compression != "none" and not args.tar:
 		print "Error: Please use --tar if you want to tar everything."
 		sys.exit(1)
@@ -1032,7 +1041,7 @@ def main():
 			server.setSSLKeys(cert, args.key)
 		if args.auth:
 			user, password = args.auth.split(":", 1)
-			server.setAuth(user, password)
+			server.setAuth(user, password, args.realm)
 		if compression and compression != "none":
 			server.setCompression(compression)
 		if args.ipv4_only or not socket.has_ipv6:
