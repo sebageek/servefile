@@ -871,13 +871,17 @@ class ServeFile():
 				try:
 					os.mkdir(self.target)
 				except (IOError, OSError):
-					raise ServeFileException("Error: Could not create directory '%s' for uploads." % (self.target,) )
+					raise ServeFileException("Error: Could not create directory '%s' for uploads." % (self.target,))
 			else:
 				raise ServeFileException("Error: Upload directory already exists and is a file.")
 			FilePutter.targetDir = self.target
 			FilePutter.maxUploadSize = self.maxUploadSize
 			handler = FilePutter
 		elif self.serveMode == self.MODE_LISTDIR:
+			if not os.path.exists(self.target):
+				raise ServeFileException("Error: Could not open file or directory.")
+			if not os.path.isdir(self.target):
+				raise ServeFileException("Error: '%s' is not a directory." % (self.target,))
 			handler = DirListingHandler
 			handler.targetDir = self.target
 
