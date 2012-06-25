@@ -395,6 +395,10 @@ class DirListingHandler(FileBaseHandler):
 </body>
 </html>""" % {'version': __version__}
 		content = []
+
+		dir_items = list()
+		file_items = list()
+
 		for item in [".."] + sorted(os.listdir(path)):
 				# create path to item
 				itemPath = os.path.join(path, item)
@@ -406,7 +410,19 @@ class DirListingHandler(FileBaseHandler):
 				except IOError:
 					continue
 
-				self._appendToListing(content, item, itemPath, stat, os.path.isdir(itemPath))
+				if os.path.isdir(itemPath):
+					target_items = dir_items
+				else:
+					target_items = file_items
+				target_items.append((item, itemPath, stat))
+
+		# Directories first, then files
+		for (tuple_list, is_dir) in (
+				(dir_items, True),
+				(file_items, False),
+				):
+			for (item, itemPath, stat) in tuple_list:
+				self._appendToListing(content, item, itemPath, stat, is_dir=is_dir)
 
 		listing = header + "\n".join(content) + footer
 
