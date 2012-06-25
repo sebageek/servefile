@@ -1000,6 +1000,10 @@ def main():
 		print "You can't listen both on IPv4 and IPv6 \"only\""
 		sys.exit(1)
 
+	if args.ipv6_only and not socket.has_ipv6:
+		print "Your system does not support IPv6"
+		sys.exit(1)
+
 	mode = None
 	if args.upload:
 		mode = ServeFile.MODE_UPLOAD
@@ -1023,7 +1027,7 @@ def main():
 			server.setAuth(user, password)
 		if compression and compression != "none":
 			server.setCompression(compression)
-		if args.ipv4_only:
+		if args.ipv4_only or not socket.has_ipv6:
 			server.setIPv6(False)
 		if args.ipv6_only:
 			server.setIPv4(False)
