@@ -334,6 +334,27 @@ class DirListingHandler(FileBaseHandler):
 			self.send_response(404)
 			self.end_headers()
 
+	def _appendToListing(self, content, item, itemPath, stat, is_dir):
+		# Strings to display on directory listing
+		lastModifiedDate = datetime.datetime.fromtimestamp(stat.st_mtime)
+		lastModified = lastModifiedDate.strftime("%Y-%m-%d %H:%M")
+		fileSize = "%.1f%s" % self.convertSize(stat.st_size)
+		(fileType, _) = mimetypes.guess_type(itemPath)
+		if not fileType:
+			fileType = "-"
+
+		if is_dir:
+			item += "/"
+			fileType = "Directory"
+		content.append("""
+			<tr>
+				<td class="name"><a href="%s">%s</a></td>
+				<td class="last-modified">%s</td>
+				<td class="size">%s</td>
+				<td class="type">%s</td>
+			</tr>
+		""" % (urllib.quote(item), item, lastModified, fileSize, fileType))
+
 	def sendDirectoryListing(self, path, head):
 		""" Generate a directorylisting for path and send it """
 		header = """<!DOCTYPE html>
@@ -385,25 +406,7 @@ class DirListingHandler(FileBaseHandler):
 				except IOError:
 					continue
 
-				# Strings to display on directory listing
-				lastModifiedDate = datetime.datetime.fromtimestamp(stat.st_mtime)
-				lastModified = lastModifiedDate.strftime("%Y-%m-%d %H:%M")
-				fileSize = "%.1f%s" % self.convertSize(stat.st_size)
-				(fileType, _) = mimetypes.guess_type(itemPath)
-				if not fileType:
-					fileType = "-"
-
-				if os.path.isdir(itemPath):
-					item += "/"
-					fileType = "Directory"
-				content.append("""
-					<tr>
-						<td class="name"><a href="%s">%s</a></td>
-						<td class="last-modified">%s</td>
-						<td class="size">%s</td>
-						<td class="type">%s</td>
-					</tr>
-				""" % (urllib.quote(item), item, lastModified, fileSize, fileType))
+				self._appendToListing(content, item, itemPath, stat, os.path.isdir(itemPath))
 
 		listing = header + "\n".join(content) + footer
 
