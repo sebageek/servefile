@@ -5,12 +5,13 @@
 # Written by Sebastian Lohff (seba@seba-geek.de)
 # http://seba-geek.de/stuff/servefile/
 
+from __future__ import print_function
+
 __version__ = '0.4.1'
 
 import argparse
 import base64
 import cgi
-import BaseHTTPServer
 import datetime
 import mimetypes
 import urllib
@@ -18,12 +19,20 @@ import os
 import posixpath
 import re
 import select
-import SocketServer
 import socket
 from stat import ST_SIZE
 from subprocess import Popen, PIPE
 import sys
 import time
+
+# fix imports for python2/python3
+try:
+    import BaseHTTPServer
+    import SocketServer
+except ImportError:
+    # both have different names in python3
+    import http.server as BaseHTTPServer
+    import socketserver as SocketServer
 
 # only activate SSL if available
 HAVE_SSL = False
@@ -147,12 +156,12 @@ class FileBaseHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 		while block:
 			try:
 				self.wfile.write(block)
-			except socket.error, e:
-				print "%s ABORTED transmission (Reason %s: %s)" % (self.client_address[0], e[0], e[1])
+			except socket.error as e:
+				print("%s ABORTED transmission (Reason %s: %s)" % (self.client_address[0], e[0], e[1]))
 				return False
 			block = self.getChunk(myfile, fromto)
 		myfile.close()
-		print "%s finished downloading %s" % (self.client_address[0], filePath)
+		print("%s finished downloading %s" % (self.client_address[0], filePath))
 		return True
 
 	def getChunk(self, myfile, fromto):
@@ -173,7 +182,7 @@ class FileBaseHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 		responseCode = 200
 		try:
 			myfile = open(path, 'rb')
-		except IOError, e:
+		except IOError as e:
 			responseCode = self.getResponseForErrno(e.errno)
 		return (responseCode, myfile)
 
@@ -188,7 +197,7 @@ class FileBaseHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 		responseCode = 200
 		try:
 			fileSize = os.stat(path)[ST_SIZE]
-		except IOError, e:
+		except IOError as e:
 			responseCode = self.getResponseForErrno(e.errno)
 		return (responseCode, fileSize)
 
@@ -243,7 +252,7 @@ class TarFileHandler(FileBaseHandler):
 		time.sleep(0.05)
 		if tarCmd.poll() != None and tarCmd.poll() != 0:
 			# something went wrong
-			print "Error while compressing '%s'. Aborting request." % self.target
+			print("Error while compressing '%s'. Aborting request." % self.target)
 			self.send_response(500)
 			self.end_headers()
 			return
@@ -257,7 +266,7 @@ class TarFileHandler(FileBaseHandler):
 			block = tarCmd.stdout.read(self.blockSize)
 			if block and block != '':
 				self.wfile.write(block)
-		print "%s finished downloading" % (self.client_address[0])
+		print("%s finished downloading" % (self.client_address[0]))
 
 	def getCompressionCmd(self):
 		if self.compression == "none":
@@ -490,7 +499,7 @@ class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
 			bytesLeft -= bytesToRead
 		target.close()
 		self.sendResponse(200, "OK! Thanks for uploading")
-		print "Received file '%s' from %s." % (destFileName, self.client_address[0])
+		print("Received file '%s' from %s." % (destFileName, self.client_address[0]))
 
 	def do_PUT(self, fromPost=False):
 		""" Upload a file via PUT
@@ -584,11 +593,11 @@ def catchSSLErrors(BaseSSLClass):
 		def handle_one_request(self, *args, **kwargs):
 			try:
 				BaseSSLClass.handle_one_request(self, *args, **kwargs)
-			except SSL.Error, e:
+			except SSL.Error as e:
 				if str(e) == "":
-					print "%s SSL Error (Empty error message)" % (self.client_address[0],)
+					print("%s SSL Error (Empty error message)" % (self.client_address[0],))
 				else:
-					print "%s SSL Error: %s" % (self.client_address[0], e)
+					print("%s SSL Error: %s" % (self.client_address[0], e))
 	return X
 
 
@@ -708,7 +717,7 @@ class ServeFile():
 		TarFileHandler.compression = compression
 
 	def genKeyPair(self):
-		print "Generating SSL certificate...",
+		print("Generating SSL certificate...", end="")
 		sys.stdout.flush()
 
 		pkey = crypto.PKey()
@@ -746,9 +755,9 @@ class ServeFile():
 		self.cert = cert
 		self.key = pkey
 
-		print "done."
-		print "SHA1 fingerprint:", cert.digest("sha1")
-		print "MD5  fingerprint:", cert.digest("md5")
+		print("done.")
+		print("SHA1 fingerprint:", cert.digest("sha1"))
+		print("MD5  fingerprint:", cert.digest("md5"))
 
 	def _getCert(self):
 		return self.cert
@@ -798,22 +807,22 @@ class ServeFile():
 			self.server.append(self._createServer(self.handler, withv6=True))
 
 		if self.serveMode != self.MODE_UPLOAD:
-			print "Serving \"%s\" at port %d." % (self.target, self.port)
+			print("Serving \"%s\" at port %d." % (self.target, self.port))
 		else:
-			print "Serving \"%s\" for uploads at port %d." % (self.target, self.port)
+			print("Serving \"%s\" for uploads at port %d." % (self.target, self.port))
 
 		# print urls with local network adresses
-		print "\nSome addresses %s will be available at:" % \
-				((self.serveMode != self.MODE_UPLOAD) and "this file" or "the uploadform", )
+		print("\nSome addresses %s will be available at:" % \
+				((self.serveMode != self.MODE_UPLOAD) and "this file" or "the uploadform", ))
 		ips = self.getIPs()
 		if not ips or len(ips) == 0 or ips[0] == '':
-			print "Could not find any addresses."
+			print("Could not find any addresses.")
 		else:
 			for ip in ips:
 				if ":" in ip:
 					ip = "[%s]" % ip
-				print "\thttp%s://%s:%d/" % (self.useSSL and "s" or "", ip, self.port)
-		print ""
+				print("\thttp%s://%s:%d/" % (self.useSSL and "s" or "", ip, self.port))
+		print()
 
 		try:
 			while True:
@@ -851,7 +860,7 @@ class ServeFile():
 			handler = TarFileHandler
 		elif self.serveMode == self.MODE_UPLOAD:
 			if os.path.isdir(self.target):
-				print "Warning: Uploading to an already existing directory."
+				print("Warning: Uploading to an already existing directory.")
 			elif not os.path.exists(self.target):
 				self.dirCreated = True
 				try:
@@ -955,54 +964,54 @@ def main():
 
 	# check for invalid option combinations/preparse stuff
 	if args.max_upload_size and not args.upload:
-		print "Error: Maximum upload size can only be specified when in upload mode."
+		print("Error: Maximum upload size can only be specified when in upload mode.")
 		sys.exit(1)
 
 	if args.max_upload_size:
 		sizeRe = re.match("^(\d+(?:[,.]\d+)?)(?:([bkmgtpe])(?:(?<!b)b?)?)?$", args.max_upload_size.lower())
 		if not sizeRe:
-			print "Error: Your max upload size param is broken."
+			print("Error: Your max upload size param is broken.")
 			sys.exit(1)
 		uploadSize, modifier = sizeRe.groups()
 		uploadSize = float(uploadSize.replace(",", "."))
 		sizes = ["b", "k", "m", "g", "t", "p", "e"]
 		maxUploadSize = int(uploadSize * pow(1024, sizes.index(modifier or "k")))
 		if maxUploadSize < 0:
-			print "Error: Your max upload size can't be negative"
+			print("Error: Your max upload size can't be negative")
 			sys.exit(1)
 
 	if args.ssl and not HAVE_SSL:
-		print "Error: SSL is not available, please install pyssl (python-openssl)."
+		print("Error: SSL is not available, please install pyssl (python-openssl).")
 		sys.exit(1)
 
 	if args.cert and not args.key:
-		print "Error: Please specify a key along with your cert."
+		print("Error: Please specify a key along with your cert.")
 		sys.exit(1)
 
 	if not args.ssl and (args.cert or args.key):
-		print "Error: You need to enable ssl with --ssl when specifying certs/keys."
+		print("Error: You need to enable ssl with --ssl when specifying certs/keys.")
 		sys.exit(1)
 
 	if args.auth:
 		dpos = args.auth.find(":")
 		if dpos <= 0 or dpos == (len(args.auth)-1):
-			print "Error: User and password for HTTP basic authentication need to be both at least one character band have to be seperated by a \":\"."
+			print("Error: User and password for HTTP basic authentication need to be both at least one character band have to be seperated by a \":\".")
 			sys.exit(1)
 
 	if args.realm and not args.auth:
-		print "You can only specify a realm when HTTP basic authentication is enabled."
+		print("You can only specify a realm when HTTP basic authentication is enabled.")
 		sys.exit(1)
 
 	if args.compression != "none" and not args.tar:
-		print "Error: Please use --tar if you want to tar everything."
+		print("Error: Please use --tar if you want to tar everything.")
 		sys.exit(1)
 
 	if args.tar and args.upload:
-		print "Error: --tar mode will not work with uploads."
+		print("Error: --tar mode will not work with uploads.")
 		sys.exit(1)
 
 	if args.tar and args.list_dir:
-		print "Error: --tar mode will not work with directory listings."
+		print("Error: --tar mode will not work with directory listings.")
 		sys.exit(1)
 
 	compression = None
@@ -1010,15 +1019,15 @@ def main():
 		if args.compression in TarFileHandler.compressionMethods:
 			compression = args.compression
 		else:
-			print "Error: Compression mode '%s' is unknown." % TarFileHandler.compression
+			print("Error: Compression mode '%s' is unknown." % TarFileHandler.compression)
 			sys.exit(1)
 
 	if args.ipv4_only and args.ipv6_only:
-		print "You can't listen both on IPv4 and IPv6 \"only\"."
+		print("You can't listen both on IPv4 and IPv6 \"only\".")
 		sys.exit(1)
 
 	if args.ipv6_only and not socket.has_ipv6:
-		print "Your system does not support IPv6."
+		print("Your system does not support IPv6.")
 		sys.exit(1)
 
 	mode = None
@@ -1049,10 +1058,10 @@ def main():
 		if args.ipv6_only:
 			server.setIPv4(False)
 		server.serve()
-	except ServeFileException, e:
-		print e
+	except ServeFileException as e:
+		print(e)
 		sys.exit(1)
-	print "Good bye."
+	print("Good bye.")
 
 
 if __name__ == '__main__':
