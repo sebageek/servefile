@@ -399,7 +399,7 @@ class DirListingHandler(FileBaseHandler):
 		dir_items = list()
 		file_items = list()
 
-		for item in [".."] + sorted(os.listdir(path)):
+		for item in [".."] + sorted(os.listdir(path), key=lambda x:x.lower()):
 				# create path to item
 				itemPath = os.path.join(path, item)
 
