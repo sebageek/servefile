@@ -270,13 +270,10 @@ class TarFileHandler(FileBaseHandler):
 
 	def getCompressionCmd(self):
 		if self.compression == "none":
-			self.fileName += ".tar"
 			cmd = ["tar", "-c"]
 		elif self.compression == "gzip":
-			self.fileName += ".tar.gz"
 			cmd = ["tar", "-cz"]
 		elif self.compression == "bzip2":
-			self.fileName += ".tar.bz2"
 			cmd = ["tar", "-cj"]
 		else:
 			raise ValueError("Unknown compression mode '%s'." % self.compression)
