@@ -782,7 +782,10 @@ class ServeFile():
 		if self.useSSL:
 			if not self._getKey():
 				self.genKeyPair()
-			server = SecureThreadedHTTPServer(self._getCert(), self._getKey(), (listenIp, self.port), handler, False)
+			try:
+				server = SecureThreadedHTTPServer(self._getCert(), self._getKey(), (listenIp, self.port), handler, False)
+			except SSL.Error as e:
+				raise ServeFileException("SSL Error: Could not read SSL public/private key from file(s) (error was: \"%s\")" % (e[0][0][2],))
 		else:
 			server = ThreadedHTTPServer((listenIp, self.port), handler, False)
 
