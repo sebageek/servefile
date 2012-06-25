@@ -798,10 +798,15 @@ class ServeFile():
 		self.handler = self._confAndFindHandler()
 		self.server = []
 
-		if self.listenIPv4:
-			self.server.append(self._createServer(self.handler))
-		if self.listenIPv6:
-			self.server.append(self._createServer(self.handler, withv6=True))
+		try:
+			currsocktype = "IPv4"
+			if self.listenIPv4:
+				self.server.append(self._createServer(self.handler))
+			currsocktype = "IPv6"
+			if self.listenIPv6:
+				self.server.append(self._createServer(self.handler, withv6=True))
+		except socket.error as e:
+			raise ServeFileException("Could not open %s socket: %s" % (currsocktype, e))
 
 		if self.serveMode != self.MODE_UPLOAD:
 			print("Serving \"%s\" at port %d." % (self.target, self.port))
