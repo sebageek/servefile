@@ -483,7 +483,11 @@ class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
 
 		# write file down to disk, send an
 		target = open(destFileName, "w")
-		target.write(fstorage["file"].file.read(length))
+		bytesLeft = length
+		while bytesLeft > 0:
+			bytesToRead = min(1024*1024, bytesLeft)
+			target.write(fstorage["file"].file.read(bytesToRead))
+			bytesLeft -= bytesToRead
 		target.close()
 		self.sendResponse(200, "OK! Thanks for uploading")
 		print "Received file '%s' from %s." % (destFileName, self.client_address[0])
@@ -517,7 +521,11 @@ class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
 			self.end_headers()
 
 		target = open(cleanFileName, "w")
-		target.write(self.rfile.read(int(self.headers['Content-Length'])))
+		bytesLeft = int(self.headers['Content-Length'])
+		while bytesLeft > 0:
+			bytesToRead = min(1024*1024, bytesLeft)
+			target.write(self.rfile.read(bytesToRead))
+			bytesLeft -= bytesToRead
 		target.close()
 		self.sendResponse(fromPost and 200 or 201, "OK!")
 
