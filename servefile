@@ -330,7 +330,24 @@ class DirListingHandler(FileBaseHandler):
 				self.sendFile(path, head)
 		else:
 			self.send_response(404)
+			errorMsg = """<!DOCTYPE html><html>
+				<head><title>404 Not Found</title></head>
+				<body>
+				<h1>Not Found</h1>
+				<p>The requestet URL %s was not found on this server</p>
+				<p><a href="/">Back to /</a>
+				</body>
+				</html>""" % self.escapeHTML(urllib.unquote(self.path))
+			self.send_header("Content-Length", str(len(errorMsg)))
 			self.end_headers()
+			if not head:
+				self.wfile.write(errorMsg)
+
+	def escapeHTML(self, htmlstr):
+		entities = [("<", "&lt;"), (">", "&gt;")]
+		for src, dst in entities:
+			htmlstr = htmlstr.replace(src, dst)
+		return htmlstr
 
 	def sendDirectoryListing(self, path, head):
 		""" Generate a directorylisting for path and send it """
@@ -400,8 +417,7 @@ class DirListingHandler(FileBaseHandler):
 						<td class="last-modified">%s</td>
 						<td class="size">%s</td>
 						<td class="type">%s</td>
-					</tr>
-				""" % (urllib.quote(item), item, lastModified, fileSize, fileType))
+					</tr>""" % (urllib.quote(item), item, lastModified, fileSize, fileType))
 
 		listing = header + "\n".join(content) + footer
 
