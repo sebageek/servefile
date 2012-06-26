@@ -994,10 +994,14 @@ def main():
 		print("Error: Maximum upload size can only be specified when in upload mode.")
 		sys.exit(1)
 
+	if args.upload and args.list_dir:
+		print("Error: Upload and dirlisting can't be enabled together.")
+		sys.exit(1)
+
 	if args.max_upload_size:
 		sizeRe = re.match("^(\d+(?:[,.]\d+)?)(?:([bkmgtpe])(?:(?<!b)b?)?)?$", args.max_upload_size.lower())
 		if not sizeRe:
-			print("Error: Your max upload size param is broken, try something like 3M or 2,5Gb.")
+			print("Error: Your max upload size param is broken. Try something like 3M or 2.5Gb.")
 			sys.exit(1)
 		uploadSize, modifier = sizeRe.groups()
 		uploadSize = float(uploadSize.replace(",", "."))
