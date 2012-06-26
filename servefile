@@ -432,12 +432,13 @@ class DirListingHandler(FileBaseHandler):
 		self.wfile.write(listing)
 
 	def convertSize(self, size):
-		ext = None
-		for ext in "BKMGT":
+		for ext in "KMGT":
+			size /= 1024.0
 			if size < 1024.0:
 				break
-			size /= 1024.0
-		return (size, ext)
+		if ext == "K" and size < 0.1:
+			size = 0.1
+		return (size, ext.strip())
 
 	def getCleanPath(self):
 		urlPath = posixpath.normpath(urllib.unquote(self.path)).strip("/")
