@@ -385,7 +385,7 @@ class DirListingHandler(FileBaseHandler):
 		<tbody>
 		""" % {'path': posixpath.normpath(urllib.unquote(self.path))}
 		footer = """</tbody></table></div>
-<div class="footer">servefile %(version)s</div>
+<div class="footer"><a href="http://seba-geek.de/stuff/servefile/">servefile %(version)s</a></div>
 </body>
 </html>""" % {'version': __version__}
 		content = []
