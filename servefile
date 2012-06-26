@@ -20,7 +20,6 @@ import posixpath
 import re
 import select
 import socket
-from stat import ST_SIZE
 from subprocess import Popen, PIPE
 import sys
 import time
@@ -108,7 +107,7 @@ class FileBaseHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 					if fromto[0] >= fileLength or fromto[0] < 0 or fromto[1] >= fileLength or fromto[1]-fromto[0] < 0:
 						# oops, already done! (requested range out of range)
 						self.send_response(416)
-						self.send_header('Content-Range', 'bytes */%s' % fileLength)
+						self.send_header('Content-Range', 'bytes */%d' % fileLength)
 						self.end_headers()
 						return (True, None)
 					return (True, fromto)
@@ -123,7 +122,7 @@ class FileBaseHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 		lastModified: time the file was last modified, None for "now"
 		"""
 		if not fileLength:
-			fileLength = os.stat(filePath)[ST_SIZE]
+			fileLength = os.stat(filePath).st_size
 
 		(responseCode, myfile) = self.getFileHandle(filePath)
 		if not myfile:
@@ -142,7 +141,7 @@ class FileBaseHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
 		if fromto != None:
 			self.send_response(216)
-			self.send_header('Content-Range', 'bytes %s-%s/%s' % (fromto[0], fromto[1], fileLength))
+			self.send_header('Content-Range', 'bytes %d-%d/%d' % (fromto[0], fromto[1], fileLength))
 			fileLength = fromto[1] - fromto[0] + 1
 		else:
 			self.send_response(200)
@@ -196,16 +195,16 @@ class FileBaseHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 		fileSize = -1
 		responseCode = 200
 		try:
-			fileSize = os.stat(path)[ST_SIZE]
+			fileSize = os.stat(path).st_size
 		except IOError as e:
 			responseCode = self.getResponseForErrno(e.errno)
 		return (responseCode, fileSize)
 
 	def getResponseForErrno(self, errno):
 		""" Return HTTP response code for an IOError errno """
-		if errno == 2:
+		if errno == errno.ENOENT:
 			return 404
-		elif errno == 13:
+		elif errno == errno.EACCESS:
 			return 403
 		else:
 			return 500
@@ -233,7 +232,6 @@ class TarFileHandler(FileBaseHandler):
 	target = None
 	compression = "none"
 	compressionMethods = ("none", "gzip", "bzip2")
-	server_version = "servefile/" + __version__
 
 	def do_HEAD(self):
 		if self.checkAndDoRedirect():
@@ -438,6 +436,7 @@ class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
 
 	targetDir = None
 	maxUploadSize = 0
+	blockSize = 1024 * 1024
 	uploadPage = """
 <!docype html>
 <html>
@@ -487,11 +486,11 @@ class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
 			self.sendResponse(400, "Filename was empty or invalid")
 			return
 
-		# write file down to disk, send an
+		# write file down to disk, send a 200 afterwards
 		target = open(destFileName, "w")
 		bytesLeft = length
 		while bytesLeft > 0:
-			bytesToRead = min(1024*1024, bytesLeft)
+			bytesToRead = min(self.blockSize, bytesLeft)
 			target.write(fstorage["file"].file.read(bytesToRead))
 			bytesLeft -= bytesToRead
 		target.close()
@@ -529,11 +528,11 @@ class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
 		target = open(cleanFileName, "w")
 		bytesLeft = int(self.headers['Content-Length'])
 		while bytesLeft > 0:
-			bytesToRead = min(1024*1024, bytesLeft)
+			bytesToRead = min(self.blockSize, bytesLeft)
 			target.write(self.rfile.read(bytesToRead))
 			bytesLeft -= bytesToRead
 		target.close()
-		self.sendResponse(fromPost and 200 or 201, "OK!")
+		self.sendResponse(200 if fromPost else 201, "OK!")
 
 	def getContentLength(self):
 		length = 0
@@ -569,7 +568,7 @@ class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
 		cleanFileName = fname.replace("/", "")
 		if cleanFileName == "":
 			return ""
-		destFileName = self.targetDir + "/" + cleanFileName
+		destFileName = os.path.join(self.targetDir, cleanFileName)
 		if not os.path.exists(destFileName):
 			return destFileName
 		else:
@@ -592,9 +591,9 @@ def catchSSLErrors(BaseSSLClass):
 				BaseSSLClass.handle_one_request(self, *args, **kwargs)
 			except SSL.Error as e:
 				if str(e) == "":
-					print("%s SSL Error (Empty error message)" % (self.client_address[0],))
+					print("%s SSL error (empty error message)" % (self.client_address[0],))
 				else:
-					print("%s SSL Error: %s" % (self.client_address[0], e))
+					print("%s SSL error: %s" % (self.client_address[0], e))
 	return X
 
 
@@ -602,7 +601,7 @@ class SecureThreadedHTTPServer(ThreadedHTTPServer):
 	def __init__(self, pubKey, privKey, server_address, RequestHandlerClass, bind_and_activate=True):
 		ThreadedHTTPServer.__init__(self, server_address, RequestHandlerClass, bind_and_activate)
 		ctx = SSL.Context(SSL.SSLv23_METHOD)
-		if type(pubKey) == crypto.X509 and type(privKey) == crypto.PKey:
+		if type(pubKey) is crypto.X509 and type(privKey) is crypto.PKey:
 			ctx.use_certificate(pubKey)
 			ctx.use_privatekey(privKey)
 		else:
@@ -689,9 +688,9 @@ class ServeFile():
 
 			# filter out ips we are not listening on
 			if not self.listenIPv6:
-				ips = filter(lambda ip: ip.find(":") == -1, ips)
+				ips = filter(lambda ip: ":" not in ip, ips)
 			if not self.listenIPv4:
-				ips = filter(lambda ip: ip.find(".") == -1, ips)
+				ips = filter(lambda ip: "." not in ip, ips)
 
 			return ips
 		return None
@@ -763,7 +762,7 @@ class ServeFile():
 		return self.key
 
 	def setAuth(self, user, password, realm=None):
-		if len(user) == "" or len(password) == "":
+		if not user or not password:
 			raise ServeFileException("User and password both need to be at least one character.")
 		self.auth = base64.b64encode("%s:%s" % (user, password))
 		self.authrealm = realm
@@ -818,7 +817,7 @@ class ServeFile():
 
 		# print urls with local network adresses
 		print("\nSome addresses %s will be available at:" % \
-				((self.serveMode != self.MODE_UPLOAD) and "this file" or "the uploadform", ))
+				("this file" if (self.serveMode != self.MODE_UPLOAD) else "the uploadform", ))
 		ips = self.getIPs()
 		if not ips or len(ips) == 0 or ips[0] == '':
 			print("Could not find any addresses.")
@@ -849,11 +848,11 @@ class ServeFile():
 			try:
 				testit = open(self.target, 'r')
 				testit.close()
-				FileHandler.filePath = self.target
-				FileHandler.fileName = os.path.basename(self.target)
-				FileHandler.fileLength = os.stat(self.target)[ST_SIZE]
 			except IOError:
 				raise ServeFileException("Error: Could not open file!")
+			FileHandler.filePath = self.target
+			FileHandler.fileName = os.path.basename(self.target)
+			FileHandler.fileLength = os.stat(self.target).st_size
 			handler = FileHandler
 		elif self.serveMode == self.MODE_SINGLETAR:
 			self.realTarget = os.path.realpath(self.target)
@@ -979,7 +978,7 @@ def main():
 	if args.max_upload_size:
 		sizeRe = re.match("^(\d+(?:[,.]\d+)?)(?:([bkmgtpe])(?:(?<!b)b?)?)?$", args.max_upload_size.lower())
 		if not sizeRe:
-			print("Error: Your max upload size param is broken.")
+			print("Error: Your max upload size param is broken, try something like 3M or 2,5Gb.")
 			sys.exit(1)
 		uploadSize, modifier = sizeRe.groups()
 		uploadSize = float(uploadSize.replace(",", "."))
@@ -1004,7 +1003,7 @@ def main():
 	if args.auth:
 		dpos = args.auth.find(":")
 		if dpos <= 0 or dpos == (len(args.auth)-1):
-			print("Error: User and password for HTTP basic authentication need to be both at least one character band have to be seperated by a \":\".")
+			print("Error: User and password for HTTP basic authentication need to be both at least one character and have to be separated by a \":\".")
 			sys.exit(1)
 
 	if args.realm and not args.auth:
@@ -1028,7 +1027,7 @@ def main():
 		if args.compression in TarFileHandler.compressionMethods:
 			compression = args.compression
 		else:
-			print("Error: Compression mode '%s' is unknown." % TarFileHandler.compression)
+			print("Error: Compression mode '%s' is unknown." % args.compression)
 			sys.exit(1)
 
 	if args.ipv4_only and args.ipv6_only:
