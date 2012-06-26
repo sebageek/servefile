@@ -681,7 +681,7 @@ class ServeFile():
 		# ip and ifconfig sometimes are located in /sbin/
 		os.environ['PATH'] += ':/sbin:/usr/sbin'
 		proc = Popen(r"ip addr|" + \
-					  "sed -n -e 's/.*inet6\? \([0-9.a-fA-F:]\+\)\/.*/\\1/ p'|" + \
+					  "sed -n -e 's/.*inet6\{0,1\} \([0-9.a-fA-F:]\+\).*/\\1/ p'|" + \
 					  "grep -v '^fe80\|^127.0.0.1\|^::1'", \
 					  shell=True, stdout=PIPE, stderr=PIPE)
 		if proc.wait() != 0:
@@ -689,8 +689,8 @@ class ServeFile():
 			oldLang = os.environ.get("LC_ALL", None)
 			os.environ['LC_ALL'] = "C"
 			proc = Popen(r"ifconfig|" + \
-						  "sed -n 's/.*inet6\? addr: \?\([0-9a-fA-F.:]*\).*/" + \
-						  "\\1/p'|" + \
+						  "sed -n 's/.*inet6\{0,1\}\( addr:\)\{0,1\} \{0,1\}\([0-9a-fA-F.:]*\).*/" + \
+						  "\\2/p'|" + \
 						  "grep -v '^fe80\|^127.0.0.1\|^::1'", \
 						  shell=True, stdout=PIPE, stderr=PIPE)
 			if oldLang:
