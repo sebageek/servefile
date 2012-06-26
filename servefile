@@ -799,11 +799,13 @@ class ServeFile():
 			if not self._getKey():
 				self.genKeyPair()
 			try:
-				server = SecureThreadedHTTPServer(self._getCert(), self._getKey(), (listenIp, self.port), handler, False)
+				server = SecureThreadedHTTPServer(self._getCert(), self._getKey(),
+									(listenIp, self.port), handler, bind_and_activate=False)
 			except SSL.Error as e:
-				raise ServeFileException("SSL Error: Could not read SSL public/private key from file(s) (error was: \"%s\")" % (e[0][0][2],))
+				raise ServeFileException("SSL error: Could not read SSL public/private key from file(s) (error was: \"%s\")" % (e[0][0][2],))
 		else:
-			server = ThreadedHTTPServer((listenIp, self.port), handler, False)
+			server = ThreadedHTTPServer((listenIp, self.port), handler,
+												bind_and_activate=False)
 
 		if withv6:
 			server.socket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
