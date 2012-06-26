@@ -1,6 +1,16 @@
 servefile changelog
 ===================
 
+2012-06-27 v0.4.2
+-----------------
+
+	0.4.2 released
+
+	* new directory listing + nicer index
+	* IPv6 support
+	* basic auth realm configurable
+	* various bugfixes
+
 2012-05-04 v0.4.1
 -----------------
 
