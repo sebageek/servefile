@@ -349,6 +349,27 @@ class DirListingHandler(FileBaseHandler):
 			htmlstr = htmlstr.replace(src, dst)
 		return htmlstr
 
+	def _appendToListing(self, content, item, itemPath, stat, is_dir):
+		# Strings to display on directory listing
+		lastModifiedDate = datetime.datetime.fromtimestamp(stat.st_mtime)
+		lastModified = lastModifiedDate.strftime("%Y-%m-%d %H:%M")
+		fileSize = "%.1f%s" % self.convertSize(stat.st_size)
+		(fileType, _) = mimetypes.guess_type(itemPath)
+		if not fileType:
+			fileType = "-"
+
+		if is_dir:
+			item += "/"
+			fileType = "Directory"
+		content.append("""
+			<tr>
+				<td class="name"><a href="%s">%s</a></td>
+				<td class="last-modified">%s</td>
+				<td class="size">%s</td>
+				<td class="type">%s</td>
+			</tr>
+		""" % (urllib.quote(item), item, lastModified, fileSize, fileType))
+
 	def sendDirectoryListing(self, path, head):
 		""" Generate a directorylisting for path and send it """
 		header = """<!DOCTYPE html>
@@ -389,7 +410,11 @@ class DirListingHandler(FileBaseHandler):
 </body>
 </html>""" % {'version': __version__}
 		content = []
-		for item in [".."] + sorted(os.listdir(path)):
+
+		dir_items = list()
+		file_items = list()
+
+		for item in [".."] + sorted(os.listdir(path), key=lambda x:x.lower()):
 				# create path to item
 				itemPath = os.path.join(path, item)
 
@@ -400,24 +425,19 @@ class DirListingHandler(FileBaseHandler):
 				except IOError:
 					continue
 
-				# Strings to display on directory listing
-				lastModifiedDate = datetime.datetime.fromtimestamp(stat.st_mtime)
-				lastModified = lastModifiedDate.strftime("%Y-%m-%d %H:%M")
-				fileSize = "%.1f%s" % self.convertSize(stat.st_size)
-				(fileType, _) = mimetypes.guess_type(itemPath)
-				if not fileType:
-					fileType = "-"
-
 				if os.path.isdir(itemPath):
-					item += "/"
-					fileType = "Directory"
-				content.append("""
-					<tr>
-						<td class="name"><a href="%s">%s</a></td>
-						<td class="last-modified">%s</td>
-						<td class="size">%s</td>
-						<td class="type">%s</td>
-					</tr>""" % (urllib.quote(item), item, lastModified, fileSize, fileType))
+					target_items = dir_items
+				else:
+					target_items = file_items
+				target_items.append((item, itemPath, stat))
+
+		# Directories first, then files
+		for (tuple_list, is_dir) in (
+				(dir_items, True),
+				(file_items, False),
+				):
+			for (item, itemPath, stat) in tuple_list:
+				self._appendToListing(content, item, itemPath, stat, is_dir=is_dir)
 
 		listing = header + "\n".join(content) + footer
 
