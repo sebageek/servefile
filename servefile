@@ -418,6 +418,10 @@ class DirListingHandler(FileBaseHandler):
 				# create path to item
 				itemPath = os.path.join(path, item)
 
+				# Hide "../" in listing of the (virtual) root directory
+				if item == '..' and path == DirListingHandler.targetDir.rstrip('/') + '/':
+					continue
+
 				# try to stat file for size, last modified... continue on error
 				stat = None
 				try:
