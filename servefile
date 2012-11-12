@@ -892,7 +892,7 @@ class ServeFile():
 				testit = open(self.target, 'r')
 				testit.close()
 			except IOError as e:
-				raise ServeFileException("Error: Could not open file, %r" % e)
+				raise ServeFileException("Error: Could not open file, %r" % (str(e),))
 			FileHandler.filePath = self.target
 			FileHandler.fileName = os.path.basename(self.target)
 			FileHandler.fileLength = os.stat(self.target).st_size
@@ -913,7 +913,7 @@ class ServeFile():
 				try:
 					os.mkdir(self.target)
 				except (IOError, OSError) as e:
-					raise ServeFileException("Error: Could not create directory '%s' for uploads, %r" % (self.target, e))
+					raise ServeFileException("Error: Could not create directory '%s' for uploads, %r" % (self.target, str(e)))
 			else:
 				raise ServeFileException("Error: Upload directory already exists and is a file.")
 			FilePutter.targetDir = self.target
