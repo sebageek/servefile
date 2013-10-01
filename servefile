@@ -869,10 +869,13 @@ class ServeFile():
 		if not ips or len(ips) == 0 or ips[0] == '':
 			print("Could not find any addresses.")
 		else:
+			pwPart = ""
+			if self.auth:
+				pwPart = base64.b64decode(self.auth) + "@"
 			for ip in ips:
 				if ":" in ip:
 					ip = "[%s]" % ip
-				print("\thttp%s://%s:%d/" % (self.useSSL and "s" or "", ip, self.port))
+				print("\thttp%s://%s%s:%d/" % (self.useSSL and "s" or "", pwPart, ip, self.port))
 		print()
 
 		try:

@@ -1,6 +1,12 @@
 servefile changelog
 ===================
 
+v0.4.3
+------
+
+	* display user/password in url-list when authentication is used
+
+
 2012-06-27 v0.4.2
 -----------------
 
