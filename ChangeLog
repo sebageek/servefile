@@ -1,10 +1,18 @@
 servefile changelog
 ===================
 
-v0.4.3
-------
+2013-12-28 v0.4.3
+-----------------
+
+	0.4.3 released
 
 	* display user/password in url-list when authentication is used
+	* various directory-listing patches by Sebastian Pipping
+		* case-insensitive sorting
+		* sort directories to top
+		* hide .. in top directory
+	* better error reporting/exception handling patch by Robert Buchholz
+	* properly tell clients that http keep-alive is not available
 
 
 2012-06-27 v0.4.2
