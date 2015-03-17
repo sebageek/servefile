@@ -154,11 +154,7 @@ class FileBaseHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 		self.end_headers()
 		block = self.getChunk(myfile, fromto)
 		while block:
-			try:
-				self.wfile.write(block)
-			except socket.error as e:
-				print("%s ABORTED transmission (Reason %s: %s)" % (self.client_address[0], e[0], e[1]))
-				return False
+			self.wfile.write(block)
 			block = self.getChunk(myfile, fromto)
 		myfile.close()
 		print("%s finished downloading %s" % (self.client_address[0], filePath))
@@ -626,7 +622,9 @@ class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
 		# never reached
 
 class ThreadedHTTPServer(SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer):
-	pass
+	def handle_error(self, request, client_address):
+		print("%s ABORTED transmission (Reason: %s)" % (client_address[0], sys.exc_value))
+
 
 def catchSSLErrors(BaseSSLClass):
 	""" Class decorator which catches SSL errors and prints them. """
