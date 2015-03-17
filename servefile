@@ -794,6 +794,8 @@ class ServeFile():
 		req.sign(pkey, "sha1")
 
 		cert = crypto.X509()
+		# Mozilla only accepts v3 certificates with v3 extensions, not v1
+		cert.set_version(0x2)
 		# some browsers complain if they see a cert from the same authority
 		# with the same serial ==> we just use the seconds as serial.
 		cert.set_serial_number(int(time.time()))
