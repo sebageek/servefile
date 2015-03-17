@@ -645,7 +645,19 @@ def catchSSLErrors(BaseSSLClass):
 class SecureThreadedHTTPServer(ThreadedHTTPServer):
 	def __init__(self, pubKey, privKey, server_address, RequestHandlerClass, bind_and_activate=True):
 		ThreadedHTTPServer.__init__(self, server_address, RequestHandlerClass, bind_and_activate)
-		ctx = SSL.Context(SSL.SSLv23_METHOD)
+
+		# choose TLS1.2 or TLS1, if available
+		sslMethod = None
+		if hasattr(SSL, "TLSv1_2_METHOD"):
+			sslMethod = SSL.TLSv1_2_METHOD
+		elif hasattr(SSL, "TLSv1_METHOD"):
+			sslMethod = SSL.TLSv1_METHOD
+		else:
+			# only SSLv23 available
+			print("Warning: Only SSLv2/SSLv3 is available, connection might be insecure.")
+			sslMethod = SSL.SSLv23_METHOD
+
+		ctx = SSL.Context(sslMethod)
 		if type(pubKey) is crypto.X509 and type(privKey) is crypto.PKey:
 			ctx.use_certificate(pubKey)
 			ctx.use_privatekey(privKey)
