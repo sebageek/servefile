@@ -673,7 +673,11 @@ class SecureThreadedHTTPServer(ThreadedHTTPServer):
 			self.server_activate()
 
 	def shutdown_request(self, request):
-		request.shutdown()
+		try:
+			request.shutdown()
+		except SSL.Error:
+			# ignore SSL errors on connection shutdown
+			pass
 
 
 class SecureHandler():
