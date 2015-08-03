@@ -321,7 +321,7 @@ class DirListingHandler(FileBaseHandler):
 					self.end_headers()
 				else:
 					self.send_response(200)
-					self.sendContentHeaders(self, path, length)
+					self.sendContentHeaders(path, length)
 					self.end_headers()
 			else:
 				self.sendFile(path, head)
