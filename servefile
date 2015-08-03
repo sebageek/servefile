@@ -102,7 +102,7 @@ class FileBaseHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 					try:
 						fromto[0] = int(fromto[0])
 						fromto[1] = int(fromto[1])
-					except:
+					except ValueError:
 						return (False, None)
 
 					if fromto[0] >= fileLength or fromto[0] < 0 or fromto[1] >= fileLength or fromto[1]-fromto[0] < 0:
