@@ -16,7 +16,6 @@ import datetime
 import mimetypes
 import urllib
 import os
-import posixpath
 import re
 import select
 import socket
@@ -402,7 +401,7 @@ class DirListingHandler(FileBaseHandler):
 			</tr>
 		</thead>
 		<tbody>
-		""" % {'path': posixpath.normpath(urllib.unquote(self.path))}
+		""" % {'path': os.path.normpath(urllib.unquote(self.path))}
 		footer = """</tbody></table></div>
 <div class="footer"><a href="http://seba-geek.de/stuff/servefile/">servefile %(version)s</a></div>
 </body>
@@ -464,7 +463,7 @@ class DirListingHandler(FileBaseHandler):
 		return (size, ext.strip())
 
 	def getCleanPath(self):
-		urlPath = posixpath.normpath(urllib.unquote(self.path)).strip("/")
+		urlPath = os.path.normpath(urllib.unquote(self.path)).strip("/")
 		path = os.path.join(self.targetDir, urlPath)
 		return path
 
