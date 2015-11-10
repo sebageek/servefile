@@ -305,6 +305,15 @@ class DirListingHandler(FileBaseHandler):
 		""" Send file or directory index, depending on requested path """
 		path = self.getCleanPath()
 
+		# check if path is in current serving directory
+		currBaseDir = os.path.abspath(self.targetDir) + os.path.sep
+		requestPath = os.path.normpath(os.path.join(currBaseDir, path)) + os.path.sep
+		if not requestPath.startswith(currBaseDir):
+			self.send_response(301)
+			self.send_header("Location", '/')
+			self.end_headers()
+			return
+
 		if os.path.isdir(path):
 			if not self.path.endswith('/'):
 				self.send_response(301)
