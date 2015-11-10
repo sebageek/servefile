@@ -1,6 +1,18 @@
 servefile changelog
 ===================
 
+2015-11-10 v0.4.4
+-----------------
+
+	0.4.4 released
+
+	* prefer using TLS1.2/TLS1 with --ssl if available
+	* issue v3 certificates for self signed certificates with --ssl
+	* removed lots of unnecessary error output
+	* fixed a bug where wrong ranges were used on a HEAD request in directory listing mode
+	* fixed a bug where directory listing mode allowed path traversal
+
+
 2013-12-28 v0.4.3
 -----------------
 
