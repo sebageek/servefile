@@ -407,9 +407,9 @@ class DirListingHandler(FileBaseHandler):
 	<table summary="Directory Listing">
 		<thead>
 			<tr>
-				<th class="name">Name</th>
-				<th class="lastModified">Last Modified</th>
-				<th class="size">Size</th>
+				<th class="name"><a onclick="sort('name');">Name</a></th>
+				<th class="last-modified"><a onclick="sort('last-modified');">Last Modified</a></th>
+				<th class="size"><a onclick="sort('size');">Size</a></th>
 				<th class="type">Type</th>
 			</tr>
 		</thead>
@@ -417,6 +417,82 @@ class DirListingHandler(FileBaseHandler):
 		""" % {'path': os.path.normpath(urllib.unquote(self.path))}
 		footer = """</tbody></table></div>
 <div class="footer"><a href="http://seba-geek.de/stuff/servefile/">servefile %(version)s</a></div>
+<script>
+    function unhumanize(text){
+        var powers = {'K': 1, 'M': 2, 'G': 3, 'T': 4};
+        var number = parseFloat(text.slice(0, text.length - 1));
+        var unit = text.slice(text.length - 1);
+        return number * Math.pow(1024, powers[unit]);
+    }
+
+
+    function compare_class(cls, modifier, a, b){
+        var atext = a.getElementsByClassName(cls).item(0).textContent,
+            btext = b.getElementsByClassName(cls).item(0).textContent,
+            atype = a.getElementsByClassName("type").item(0).innerHTML,
+            btype = b.getElementsByClassName("type").item(0).innerHTML;
+
+        // always keep directories on top
+        if (atype !== btype) {
+            if (atype === "Directory")
+                return -1
+            if (btype === "Directory")
+                return 1
+        }
+
+        if (cls === "name"){
+            if (atype === "Directory")
+                atext = atext.slice(0, atext.length - 1);
+
+            if (btype === "Directory")
+                btext = btext.slice(0, btext.length - 1);
+        }
+
+        if (cls === "size"){
+            aint = unhumanize(atext);
+            bint = unhumanize(btext);
+            // don't change the order of same-size objects
+            if (aint === bint)
+                return 1;
+            return aint > bint ? modifier : -modifier;
+        }
+        else
+            return atext.localeCompare(btext) * modifier;
+    }
+
+
+    function move_rows(e, i, a){
+        if (i === a.length - 1)
+            return;
+        var par = e.parentNode,
+            next = e.nextSibling;
+        if (next === a[i+1])
+            return;
+        par.removeChild(a[i+1]);
+        if (next)
+            par.insertBefore(a[i+1], next);
+        else
+            par.appendChild(a[i+1]);
+    }
+
+    function sort(cls){
+        var arr = Array.prototype.slice.call(document.getElementsByTagName("tr"));
+        var e = arr.shift();
+        if (!e.sort_modifier || e.sort_cls !== cls)
+            if (cls === "name")
+                e.sort_modifier = -1;
+            else
+                e.sort_modifier = 1;
+        e.sort_cls = cls;
+        e.sort_modifier = -1 * e.sort_modifier;
+        arr = arr.sort(function (a, b) { return compare_class(cls, e.sort_modifier, a, b); });
+        arr.forEach(move_rows);
+    }
+
+    var e = document.getElementsByTagName("tr").item(0);
+    e.sort_modifier = 1;
+    e.sort_cls = "name";
+</script>
 </body>
 </html>""" % {'version': __version__}
 		content = []
