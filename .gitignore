@@ -1,2 +1,7 @@
 MANIFEST
 dist/
+*.pyc
+__pycache__
+*.swp
+servefile.egg-info
+.tox

@@ -12,6 +12,7 @@ setup(
 	url='http://seba-geek.de/stuff/servefile/',
 	author='Sebastian Lohff',
 	author_email='seba@someserver.de',
+	install_requires=['pyopenssl'],
 	scripts=['servefile'],
 )
 
