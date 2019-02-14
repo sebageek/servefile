@@ -227,7 +227,7 @@ class FileHandler(FileBaseHandler):
 class TarFileHandler(FileBaseHandler):
 	target = None
 	compression = "none"
-	compressionMethods = ("none", "gzip", "bzip2")
+	compressionMethods = ("none", "gzip", "bzip2", "xz")
 
 	def do_HEAD(self):
 		if self.checkAndDoRedirect():
@@ -269,6 +269,8 @@ class TarFileHandler(FileBaseHandler):
 			cmd = ["tar", "-cz"]
 		elif self.compression == "bzip2":
 			cmd = ["tar", "-cj"]
+		elif self.compression == "xz":
+			cmd = ["tar", "-cJ"]
 		else:
 			raise ValueError("Unknown compression mode '%s'." % self.compression)
 
@@ -287,6 +289,8 @@ class TarFileHandler(FileBaseHandler):
 			return ".tar.gz"
 		elif TarFileHandler.compression == "bzip2":
 			return ".tar.bz2"
+		elif TarFileHandler.compression == "xz":
+			return ".tar.xz"
 		raise ValueError("Unknown compression mode '%s'." % TarFileHandler.compression)
 
 
