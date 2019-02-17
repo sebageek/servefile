@@ -167,6 +167,33 @@ def test_serve_directory(run_servefile, datadir):
     check_download('jup!', '/bar/thisisaverylongfilenamefortestingthatthisstillworksproperly')
 
 
+def test_serve_relative_directory(run_servefile, datadir):
+    d = {
+        'foo': {'kratzbaum': 'cat', 'I like Cats!': 'kitteh', '&&&&&&&': 'wheee'},
+        'bar': {'thisisaverylongfilenamefortestingthatthisstillworksproperly': 'jup!'},
+        'noot': 'still data in here',
+        'bigfile': 'x' * (10 * 1024 ** 2),
+    }
+    p = datadir(d)
+    run_servefile(['../', '-l'], cwd=os.path.join(str(p), 'foo'))
+
+    # check if all files are in directory listing
+    # (could be made more sophisticated with beautifulsoup)
+    for path in '/', '/../':
+        r = make_request(path)
+        for k in d:
+            assert k in r.text
+
+    for fname, content in d['foo'].items():
+        check_download(content, '/foo/' + fname)
+
+    r = make_request('/unknown')
+    assert r.status_code == 404
+
+    # download
+    check_download('jup!', '/bar/thisisaverylongfilenamefortestingthatthisstillworksproperly')
+
+
 def test_upload(run_servefile, tmp_path):
     data = ('this is my live now\n'
             'uploading strings to servers\n'
