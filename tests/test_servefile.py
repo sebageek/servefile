@@ -274,3 +274,13 @@ def test_https(run_servefile, datadir):
     # assert fingerprint
     urllib3.disable_warnings()
     check_download(data, protocol='https', verify=False)
+
+def test_https_big_download(run_servefile, datadir):
+    # test with about 10 mb of data
+    data = "x" * (10 * 1024 ** 2)
+    p = datadir({'testfile': data}) / 'testfile'
+    run_servefile(['--ssl', str(p)])
+    time.sleep(0.2)  # time for generating ssl certificates
+
+    urllib3.disable_warnings()
+    check_download(data, protocol='https', verify=False)

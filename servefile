@@ -13,6 +13,7 @@ import argparse
 import base64
 import cgi
 import datetime
+import io
 import mimetypes
 import os
 import re
@@ -771,8 +772,19 @@ class SecureThreadedHTTPServer(ThreadedHTTPServer):
 class SecureHandler():
 	def setup(self):
 		self.connection = self.request
-		self.rfile = socket._fileobject(self.request, "rb", self.rbufsize)
-		self.wfile = socket._fileobject(self.request, "wb", self.wbufsize)
+
+		if sys.version_info[0] > 2:
+			# python3 SocketIO (replacement for socket._fileobject)
+			raw_read_sock = socket.SocketIO(self.request, 'rb')
+			raw_write_sock = socket.SocketIO(self.request, 'wb')
+			rbufsize = self.rbufsize > 0 and self.rbufsize or io.DEFAULT_BUFFER_SIZE
+			wbufsize = self.wbufsize > 0 and self.wbufsize or io.DEFAULT_BUFFER_SIZE
+			self.rfile = io.BufferedReader(raw_read_sock, rbufsize)
+			self.wfile = io.BufferedWriter(raw_write_sock, wbufsize)
+		else:
+			# python2 does not have SocketIO
+			self.rfile = socket._fileobject(self.request, "rb", self.rbufsize)
+			self.wfile = socket._fileobject(self.request, "wb", self.wbufsize)
 
 class ServeFileException(Exception):
 	pass
