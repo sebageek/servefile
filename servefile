@@ -849,9 +849,9 @@ class ServeFile():
 
 			# filter out ips we are not listening on
 			if not self.listenIPv6:
-				ips = filter(lambda ip: ":" not in ip, ips)
+				ips = [ip for ip in ips if '.' in ip]
 			if not self.listenIPv4:
-				ips = filter(lambda ip: "." not in ip, ips)
+				ips = [ip for ip in ips if ':' in ip]
 
 			return ips
 		return None

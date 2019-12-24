@@ -118,6 +118,14 @@ def test_specify_port(run_servefile, datadir):
     check_download(data, fname='testfile', port=8081)
 
 
+def test_ipv4_only(run_servefile, datadir):
+    data = "NOOT NOOT"
+    p = datadir({'testfile': data}) / 'testfile'
+    run_servefile([str(p), '-4'])
+
+    check_download(data, fname='testfile', host='127.0.0.1')
+
+
 def test_big_download(run_servefile, datadir):
     # test with about 10 mb of data
     data = "x" * (10 * 1024 ** 2)
