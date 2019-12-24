@@ -2,12 +2,19 @@ import io
 import os
 import pytest
 import requests
+import socket
 import subprocess
 import tarfile
 import time
 import urllib3
 
 # crudly written to learn more about pytest and to have a base for refactoring
+
+try:
+    ConnectionRefusedError
+    connrefused_exc = ConnectionRefusedError
+except NameError:
+    connrefused_exc = socket.error
 
 
 @pytest.fixture
@@ -116,6 +123,18 @@ def test_specify_port(run_servefile, datadir):
     run_servefile([str(p), '-p', '8081'])
 
     check_download(data, fname='testfile', port=8081)
+
+
+def test_ipv4_only(run_servefile, datadir):
+    data = "NOOT NOOT"
+    p = datadir({'testfile': data}) / 'testfile'
+    run_servefile([str(p), '-4'])
+
+    check_download(data, fname='testfile', host='127.0.0.1')
+
+    sock = socket.socket(socket.AF_INET6)
+    with pytest.raises(connrefused_exc):
+        sock.connect(("::1", 8080))
 
 
 def test_big_download(run_servefile, datadir):
