@@ -4,16 +4,17 @@ import pytest
 import requests
 import socket
 import subprocess
+import sys
 import tarfile
 import time
 import urllib3
 
 # crudly written to learn more about pytest and to have a base for refactoring
 
-try:
-    ConnectionRefusedError
+
+if sys.version_info.major >= 3:
     connrefused_exc = ConnectionRefusedError
-except NameError:
+else:
     connrefused_exc = socket.error
 
 
