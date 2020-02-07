@@ -13,8 +13,10 @@ import urllib3
 
 
 if sys.version_info.major >= 3:
+    from pathlib import Path
     connrefused_exc = ConnectionRefusedError
 else:
+    from pathlib2 import Path
     connrefused_exc = socket.error
 
 
@@ -26,7 +28,8 @@ def run_servefile():
         if not isinstance(args, list):
             args = [args]
         print("running with args", args)
-        p = subprocess.Popen(['servefile'] + args, **kwargs)
+        servefile_path = str(Path(__file__).parent.parent / 'servefile')
+        p = subprocess.Popen([sys.executable, servefile_path] + args, **kwargs)
         time.sleep(kwargs.get('timeout', 0.3))
         instances.append(p)
 
