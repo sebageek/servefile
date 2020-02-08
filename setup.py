@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-from distutils.core import setup
+from setuptools import setup
 
 setup(
 	name='servefile',
@@ -9,7 +9,7 @@ setup(
 	platforms='posix',
 	version='0.4.4',
 	license='GPLv3 or later',
-	url='http://seba-geek.de/stuff/servefile/',
+	url='https://seba-geek.de/stuff/servefile/',
 	author='Sebastian Lohff',
 	author_email='seba@someserver.de',
 	install_requires=['pyopenssl'],
@@ -19,5 +19,22 @@ setup(
 		'requests',
 	],
 	scripts=['servefile'],
+	classifiers=[
+		'Development Status :: 5 - Production/Stable',
+		'Environment :: Console',
+		'Intended Audience :: End Users/Desktop',
+		'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)',
+		'Natural Language :: English',
+		'Programming Language :: Python',
+		'Programming Language :: Python :: 2',
+		'Programming Language :: Python :: 2.7',
+		'Programming Language :: Python :: 3',
+		'Programming Language :: Python :: 3.6',
+		'Topic :: Communications',
+		'Topic :: Communications :: File Sharing',
+		'Topic :: Internet',
+		'Topic :: Internet :: WWW/HTTP',
+		'Topic :: Internet :: WWW/HTTP :: HTTP Servers',
+		'Topic :: Utilities',
+	],
 )
-
