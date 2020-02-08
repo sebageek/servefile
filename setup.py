@@ -13,6 +13,10 @@ setup(
 	author='Sebastian Lohff',
 	author_email='seba@someserver.de',
 	install_requires=['pyopenssl'],
+	tests_require=[
+		'pytest',
+		'requests',
+	],
 	scripts=['servefile'],
 )
 
