@@ -97,6 +97,12 @@ def _test_version(run_servefile, standalone):
     s.wait()
     version = s.stdout.readline().decode().strip()
 
+    # python2 is deprecated, but we still want our tests to run for it
+    # CryptographyDeprecationWarnings get in the way for this
+    if 'CryptographyDeprecationWarning' in version:
+        s.stdout.readline()  # ignore "from x import y" line
+        version = s.stdout.readline().decode().strip()
+
     # hardcode version as string until servefile is a module
     assert version == 'servefile 0.4.4'
 
