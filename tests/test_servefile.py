@@ -27,9 +27,15 @@ def run_servefile():
     def _run_servefile(args, **kwargs):
         if not isinstance(args, list):
             args = [args]
-        print("running with args", args)
-        servefile_path = str(Path(__file__).parent.parent / 'servefile')
-        p = subprocess.Popen([sys.executable, servefile_path] + args, **kwargs)
+        if kwargs.pop('standalone', None):
+            # directly call servefile.py
+            servefile_path = [str(Path(__file__).parent.parent / 'servefile' / 'servefile.py')]
+        else:
+            # call servefile as python module
+            servefile_path = ['-m', 'servefile']
+
+        print("running {} with args {}".format(", ".join(servefile_path), args))
+        p = subprocess.Popen([sys.executable] + servefile_path + args, **kwargs)
         time.sleep(kwargs.get('timeout', 0.3))
         instances.append(p)
 
@@ -85,14 +91,23 @@ def check_download(expected_data=None, path='/', fname=None, status_code=200, **
     return r  # for additional tests
 
 
-def test_version(run_servefile):
+def _test_version(run_servefile, standalone):
     # we expect the version on stdout (python3.4+) or stderr(python2.6-3.3)
-    s = run_servefile('--version', stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    s = run_servefile('--version', standalone=standalone, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     s.wait()
     version = s.stdout.readline().decode().strip()
 
     # hardcode version as string until servefile is a module
     assert version == 'servefile 0.4.4'
+
+
+def test_version(run_servefile):
+    _test_version(run_servefile, standalone=False)
+
+
+def test_version_standalone(run_servefile):
+    # test if servefile also works by calling servefile.py directly
+    _test_version(run_servefile, standalone=True)
 
 
 def test_correct_headers(run_servefile, datadir):
@@ -324,6 +339,7 @@ def test_https(run_servefile, datadir):
     # assert fingerprint
     urllib3.disable_warnings()
     check_download(data, protocol='https', verify=False)
+
 
 def test_https_big_download(run_servefile, datadir):
     # test with about 10 mb of data

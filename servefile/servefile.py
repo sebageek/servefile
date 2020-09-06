@@ -1109,7 +1109,7 @@ class AuthenticationHandler():
 
 
 def main():
-	parser = argparse.ArgumentParser(description='Serve a single file via HTTP.')
+	parser = argparse.ArgumentParser(prog='servefile', description='Serve a single file via HTTP.')
 	parser.add_argument('--version', action='version', version='%(prog)s ' + __version__)
 	parser.add_argument('target', metavar='file/directory', type=str)
 	parser.add_argument('-p', '--port', type=int, default=8080, \

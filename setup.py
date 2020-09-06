@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 from setuptools import setup
 
@@ -18,6 +18,12 @@ setup(
         'pytest',
         'requests',
     ],
+    packages=["servefile"],
+    entry_points={
+        "console_scripts": [
+            "servefile = servefile.servefile:main",
+        ],
+    },
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'Environment :: Console',
