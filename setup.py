@@ -13,7 +13,7 @@ setup(
     platforms='posix',
     version='0.4.4',
     license='GPLv3 or later',
-    url='https://seba-geek.de/stuff/servefile/',
+    url='https://github.com/sebageek/servefile/',
     author='Sebastian Lohff',
     author_email='seba@someserver.de',
     install_requires=['pyopenssl'],
