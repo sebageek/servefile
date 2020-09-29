@@ -11,7 +11,7 @@ setup(
     long_description=long_description,
     long_description_content_type='text/markdown',
     platforms='posix',
-    version='0.4.4',
+    version='0.5.0',
     license='GPLv3 or later',
     url='https://github.com/sebageek/servefile/',
     author='Sebastian Lohff',

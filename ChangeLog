@@ -1,6 +1,18 @@
 servefile changelog
 ===================
 
+
+2020-10-29 v0.5.0
+---------------------------
+
+	0.5.0 released
+
+	* python3 support
+	* test suite
+	* fixed an endless redirect loop when serving ../
+	* added sorting for list view
+	* added lzma/xz as compression method
+
 2015-11-10 v0.4.4
 -----------------
 
