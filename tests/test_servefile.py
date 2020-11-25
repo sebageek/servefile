@@ -356,3 +356,24 @@ def test_https_big_download(run_servefile, datadir):
 
     urllib3.disable_warnings()
     check_download(data, protocol='https', verify=False)
+
+
+def test_abort_download(run_servefile, datadir):
+    data = "x" * (10 * 1024 ** 2)
+    p = datadir({'testfile': data}) / 'testfile'
+    env = os.environ.copy()
+    env['PYTHONUNBUFFERED'] = '1'
+    proc = run_servefile(str(p), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
+
+    # provoke a connection abort
+    # hopefully the buffers will not fill up with all of the 10mb
+    sock = socket.socket(socket.AF_INET)
+    sock.connect(("localhost", 8080))
+    sock.send(b"GET /testfile HTTP/1.0\n\n")
+    resp = sock.recv(100)
+    assert resp != b''
+    sock.close()
+    time.sleep(0.1)
+    proc.kill()
+    out = proc.stdout.read().decode()
+    assert "127.0.0.1 ABORTED transmission" in out
