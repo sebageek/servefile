@@ -714,7 +714,8 @@ class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
 
 class ThreadedHTTPServer(SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer):
 	def handle_error(self, request, client_address):
-		print("%s ABORTED transmission (Reason: %s)" % (client_address[0], sys.exc_value))
+		_, exc_value, _ = sys.exc_info()
+		print("%s ABORTED transmission (Reason: %s)" % (client_address[0], exc_value))
 
 
 def catchSSLErrors(BaseSSLClass):
