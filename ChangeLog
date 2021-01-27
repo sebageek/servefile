@@ -6,6 +6,7 @@ Unreleased
 ----------
 
 	* fixed bug where exception was shown on transmission abort with python3
+	* fixed wrong/outdated pyopenssl package names
 
 
 2020-10-30 v0.5.1
