@@ -858,7 +858,7 @@ class ServeFile():
 		return None
 
 	def setSSLKeys(self, cert, key):
-		""" Set SSL cert/key. Can be either path to file or pyssl X509/PKey object. """
+		""" Set SSL cert/key. Can be either path to file or pyopenssl X509/PKey object. """
 		self.cert = cert
 		self.key = key
 
@@ -1167,7 +1167,7 @@ def main():
 			sys.exit(1)
 
 	if args.ssl and not HAVE_SSL:
-		print("Error: SSL is not available, please install pyssl (python-openssl).")
+		print("Error: SSL is not available, please install pyopenssl (python3-openssl).")
 		sys.exit(1)
 
 	if args.cert and not args.key:
