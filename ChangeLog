@@ -7,6 +7,10 @@ Unreleased
 
 	* fixed bug where exception was shown on transmission abort with python3
 	* fixed wrong/outdated pyopenssl package names
+	* tests are now using a free non-default port to avoid clashes; if
+	  wished the ports can be set from outside by specifying the
+	  environment variables SERVEFILE_DEFAULT_PORT and
+	  SERVEFILE_SECONDARY_PORT
 
 
 2020-10-30 v0.5.1
