@@ -20,6 +20,21 @@ else:
     connrefused_exc = socket.error
 
 
+def _get_port_from_env(var_name, default):
+    port = int(os.environ.get(var_name, default))
+    if port == 0:
+        # do a one-time port selection for a free port, use it for all tests
+        s = socket.socket()
+        s.bind(('', 0))
+        port = s.getsockname()[1]
+        s.close()
+    return port
+
+
+SERVEFILE_DEFAULT_PORT = _get_port_from_env('SERVEFILE_DEFAULT_PORT', 0)
+SERVEFILE_SECONDARY_PORT = _get_port_from_env('SERVEFILE_SECONDARY_PORT', 0)
+
+
 @pytest.fixture
 def run_servefile():
     instances = []
@@ -33,6 +48,10 @@ def run_servefile():
         else:
             # call servefile as python module
             servefile_path = ['-m', 'servefile']
+
+        # use non-default default port, if one is given via env (and none via args)
+        if '-p' not in args and '--port' not in args:
+            args.extend(['-p', str(SERVEFILE_DEFAULT_PORT)])
 
         print("running {} with args {}".format(", ".join(servefile_path), args))
         p = subprocess.Popen([sys.executable] + servefile_path + args, **kwargs)
@@ -69,7 +88,8 @@ def datadir(tmp_path):
     return _datadir
 
 
-def make_request(path='/', host='localhost', port=8080, method='get', protocol='http', **kwargs):
+def make_request(path='/', host='localhost', port=SERVEFILE_DEFAULT_PORT, method='get', protocol='http', timeout=5,
+                 **kwargs):
     url = '{}://{}:{}{}'.format(protocol, host, port, path)
     print('Calling {} on {} with {}'.format(method, url, kwargs))
     r = getattr(requests, method)(url, **kwargs)
@@ -145,9 +165,9 @@ def test_redirect_and_download(run_servefile, datadir):
 def test_specify_port(run_servefile, datadir):
     data = "NOOT NOOT"
     p = datadir({'testfile': data}) / 'testfile'
-    run_servefile([str(p), '-p', '8081'])
+    run_servefile([str(p), '-p', str(SERVEFILE_SECONDARY_PORT)])
 
-    check_download(data, fname='testfile', port=8081)
+    check_download(data, fname='testfile', port=SERVEFILE_SECONDARY_PORT)
 
 
 def test_ipv4_only(run_servefile, datadir):
@@ -159,7 +179,7 @@ def test_ipv4_only(run_servefile, datadir):
 
     sock = socket.socket(socket.AF_INET6)
     with pytest.raises(connrefused_exc):
-        sock.connect(("::1", 8080))
+        sock.connect(("::1", SERVEFILE_DEFAULT_PORT))
 
 
 def test_big_download(run_servefile, datadir):
@@ -368,7 +388,7 @@ def test_abort_download(run_servefile, datadir):
     # provoke a connection abort
     # hopefully the buffers will not fill up with all of the 10mb
     sock = socket.socket(socket.AF_INET)
-    sock.connect(("localhost", 8080))
+    sock.connect(("localhost", SERVEFILE_DEFAULT_PORT))
     sock.send(b"GET /testfile HTTP/1.0\n\n")
     resp = sock.recv(100)
     assert resp != b''
