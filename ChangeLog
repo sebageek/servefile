@@ -13,6 +13,7 @@ Unreleased
 	  SERVEFILE_SECONDARY_PORT
 	* fixed broken redirect when filename contained umlauts or other characters
 	  that should have been quoted
+	* drop python3.5 support
 
 
 2020-10-30 v0.5.1
