@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import io
 import os
 import pytest
@@ -14,9 +15,11 @@ import urllib3
 
 if sys.version_info.major >= 3:
     from pathlib import Path
+    from urllib.parse import quote
     connrefused_exc = ConnectionRefusedError
 else:
     from pathlib2 import Path
+    from urllib import quote
     connrefused_exc = socket.error
 
 
@@ -81,7 +84,7 @@ def datadir(tmp_path):
                 _datadir(v, new_path)
             else:
                 if hasattr(v, 'decode'):
-                    v = v.decode()  # python2 compability
+                    v = v.decode('utf-8')  # python2 compability
                 (path / k).write_text(v)
 
         return path
@@ -162,6 +165,23 @@ def test_redirect_and_download(run_servefile, datadir):
     check_download(data, fname='testfile')
 
 
+def test_redirect_and_download_with_umlaut(run_servefile, datadir):
+    data = "NÖÖT NÖÖT"
+    filename = "tästføile"
+    p = datadir({filename: data}) / filename
+    run_servefile(str(p))
+
+    # redirect
+    r = make_request(allow_redirects=False)
+    assert r.status_code == 302
+    assert r.headers.get('Location') == '/{}'.format(quote(filename))
+
+    # normal download
+    if sys.version_info.major < 3:
+        data = unicode(data, 'utf-8')
+    check_download(data, fname=filename)
+
+
 def test_specify_port(run_servefile, datadir):
     data = "NOOT NOOT"
     p = datadir({'testfile': data}) / 'testfile'
@@ -210,6 +230,7 @@ def test_serve_directory(run_servefile, datadir):
         'bar': {'thisisaverylongfilenamefortestingthatthisstillworksproperly': 'jup!'},
         'noot': 'still data in here',
         'bigfile': 'x' * (10 * 1024 ** 2),
+        'möwe': 'KRAKRAKRAKA',
     }
     p = datadir(d)
     run_servefile([str(p), '-l'])
@@ -219,7 +240,7 @@ def test_serve_directory(run_servefile, datadir):
     for path in '/', '/../':
         r = make_request(path)
         for k in d:
-            assert k in r.text
+            assert quote(k) in r.text
 
     for fname, content in d['foo'].items():
         check_download(content, '/foo/' + fname)

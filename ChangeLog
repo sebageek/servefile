@@ -11,6 +11,8 @@ Unreleased
 	  wished the ports can be set from outside by specifying the
 	  environment variables SERVEFILE_DEFAULT_PORT and
 	  SERVEFILE_SECONDARY_PORT
+	* fixed broken redirect when filename contained umlauts or other characters
+	  that should have been quoted
 
 
 2020-10-30 v0.5.1

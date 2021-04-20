@@ -60,7 +60,7 @@ class FileBaseHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 			fileName = self.fileName
 		if unquote(self.path) != "/" + fileName:
 			self.send_response(302)
-			self.send_header('Location', '/' + fileName)
+			self.send_header('Location', '/' + quote(fileName))
 			self.end_headers()
 			return True
 		return False
