@@ -637,7 +637,7 @@ class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
 		http://host:8080/testfile will cause the file to be named testfile. If
 		no filename is given, a random name will be generated.
 
-		Files can be uploaded with e.g. curl -X POST -d @file <url> .
+		Files can be uploaded with e.g. curl -T file <url> .
 		"""
 		length = self.getContentLength()
 		if length < 0:
@@ -654,11 +654,11 @@ class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
 			return
 
 		# Sometimes clients want to be told to continue with their transfer
-		if self.headers.getheader("Expect") == "100-continue":
+		if self.headers.get("Expect") == "100-continue":
 			self.send_response(100)
 			self.end_headers()
 
-		target = open(cleanFileName, "w")
+		target = open(cleanFileName, "wb")
 		bytesLeft = int(self.headers['Content-Length'])
 		while bytesLeft > 0:
 			bytesToRead = min(self.blockSize, bytesLeft)
