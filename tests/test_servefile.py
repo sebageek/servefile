@@ -291,6 +291,13 @@ def test_upload(run_servefile, tmp_path):
     with open(str(uploaddir / 'haiku.txt(1)')) as f:
         assert f.read() == data
 
+    # upload file using PUT
+    r = make_request("/haiku.txt", method='put', data=data)
+    assert r.status_code == 201
+    assert 'OK!' in r.text
+    with open(str(uploaddir / 'haiku.txt(2)')) as f:
+        assert f.read() == data
+
 
 def test_upload_size_limit(run_servefile, tmp_path):
     uploaddir = tmp_path / 'upload'
