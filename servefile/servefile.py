@@ -542,7 +542,9 @@ class DirListingHandler(FileBaseHandler):
 		self.send_header("Content-Length", str(len(listing)))
 		self.send_header('Connection', 'close')
 		self.end_headers()
-		self.wfile.write(listing.encode())
+		if sys.version_info.major >= 3:
+			listing = listing.encode()
+		self.wfile.write(listing)
 
 	def convertSize(self, size):
 		for ext in "KMGT":
