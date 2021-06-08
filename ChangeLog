@@ -13,6 +13,7 @@ Unreleased
 	  SERVEFILE_SECONDARY_PORT
 	* fixed broken redirect when filename contained umlauts or other characters
 	  that should have been quoted
+	* fixed broken special char handling in directory listing for python2
 	* drop python3.5 support
 
 
