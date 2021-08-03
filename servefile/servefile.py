@@ -418,7 +418,7 @@ class DirListingHandler(FileBaseHandler):
             </tr>
         </thead>
         <tbody>
-        """ % {'path': os.path.normpath(unquote(self.path))}
+        """ % {'path': os.path.normpath(unquote(self.path))}  # noqa: E501
         footer = """</tbody></table></div>
 <div class="footer"><a href="http://seba-geek.de/stuff/servefile/">servefile %(version)s</a></div>
 <script>
@@ -818,7 +818,8 @@ class ServeFile():
 
         if self.serveMode not in range(self._NUM_MODES):
             self.serveMode = None
-            raise ValueError("Unknown serve mode, needs to be MODE_SINGLE, MODE_SINGLETAR, MODE_UPLOAD or MODE_DIRLIST.")
+            raise ValueError("Unknown serve mode, needs to be MODE_SINGLE, "
+                             "MODE_SINGLETAR, MODE_UPLOAD or MODE_DIRLIST.")
 
     def setIPv4(self, ipv4):
         """ En- or disable ipv4 """
@@ -832,19 +833,19 @@ class ServeFile():
         """ Get IPs from all interfaces via ip or ifconfig. """
         # ip and ifconfig sometimes are located in /sbin/
         os.environ['PATH'] += ':/sbin:/usr/sbin'
-        proc = Popen(r"ip addr|" + \
-                      "sed -n -e 's/.*inet6\{0,1\} \([0-9.a-fA-F:]\+\).*/\\1/ p'|" + \
-                      "grep -v '^fe80\|^127.0.0.1\|^::1'", \
-                      shell=True, stdout=PIPE, stderr=PIPE)
+        proc = Popen(r"ip addr|"
+                     r"sed -n -e 's/.*inet6\{0,1\} \([0-9.a-fA-F:]\+\).*/\1/ p'|"
+                     r"grep -v '^fe80\|^127.0.0.1\|^::1'",
+                     shell=True, stdout=PIPE, stderr=PIPE)
         if proc.wait() != 0:
             # ip failed somehow, falling back to ifconfig
             oldLang = os.environ.get("LC_ALL", None)
             os.environ['LC_ALL'] = "C"
-            proc = Popen(r"ifconfig|" + \
-                          "sed -n 's/.*inet6\{0,1\}\( addr:\)\{0,1\} \{0,1\}\([0-9a-fA-F.:]*\).*/" + \
-                          "\\2/p'|" + \
-                          "grep -v '^fe80\|^127.0.0.1\|^::1'", \
-                          shell=True, stdout=PIPE, stderr=PIPE)
+            proc = Popen(r"ifconfig|"
+                         r"sed -n 's/.*inet6\{0,1\}\( addr:\)\{0,1\} \{0,1\}\([0-9a-fA-F.:]*\).*/"
+                         r"\2/p'|"
+                         r"grep -v '^fe80\|^127.0.0.1\|^::1'",
+                         shell=True, stdout=PIPE, stderr=PIPE)
             if oldLang:
                 os.environ['LC_ALL'] = oldLang
             else:
@@ -891,7 +892,7 @@ class ServeFile():
         req = crypto.X509Req()
         subj = req.get_subject()
         subj.CN = "127.0.0.1"
-        subj.O = "servefile laboratories"
+        subj.O = "servefile laboratories"  # noqa: E741
         subj.OU = "servefile"
 
         # generate altnames
@@ -1047,7 +1048,8 @@ class ServeFile():
                 try:
                     os.mkdir(self.target)
                 except (IOError, OSError) as e:
-                    raise ServeFileException("Error: Could not create directory '%s' for uploads, %r" % (self.target, str(e)))
+                    raise ServeFileException("Error: Could not create directory '%s' for uploads, %r" %
+                                             (self.target, str(e)))
             else:
                 raise ServeFileException("Error: Upload directory already exists and is a file.")
             FilePutter.targetDir = os.path.abspath(self.target)
@@ -1112,7 +1114,8 @@ class AuthenticationHandler():
             self.send_response(401)
             self.send_header("WWW-Authenticate", "Basic realm=\"%s\"" % self.realm)
             self.send_header("Connection", "close")
-            errorMsg = "<html><head><title>401 - Unauthorized</title></head><body><h1>401 - Unauthorized</h1></body></html>"
+            errorMsg = ("<html><head><title>401 - Unauthorized</title></head>"
+                        "<body><h1>401 - Unauthorized</h1></body></html>")
             self.send_header("Content-Length", str(len(errorMsg)))
             self.end_headers()
             self.wfile.write(errorMsg.encode())
@@ -1133,7 +1136,8 @@ def main():
     parser.add_argument('--ssl', action="store_true", default=False,
                         help="Enable SSL. If no key/cert is specified one will be generated")
     parser.add_argument('--key', type=str,
-                        help="Keyfile to use for SSL. If no cert is given with --cert the keyfile will also be searched for a cert")
+                        help="Keyfile to use for SSL. If no cert is given with --cert the keyfile "
+                             "will also be searched for a cert")
     parser.add_argument('--cert', type=str,
                         help="Certfile to use for SSL")
     parser.add_argument('-a', '--auth', type=str, metavar='user:password',
@@ -1141,10 +1145,12 @@ def main():
     parser.add_argument('--realm', type=str, default=None,
                         help="Set a realm for HTTP basic authentication")
     parser.add_argument('-t', '--tar', action="store_true", default=False,
-                        help="Enable on the fly tar creation for given file or directory. Note: Download continuation will not be available")
+                        help="Enable on the fly tar creation for given file or directory. "
+                             "Note: Download continuation will not be available")
     parser.add_argument('-c', '--compression', type=str, metavar='method',
                         default="none",
-                        help="Set compression method, only in combination with --tar. Can be one of %s" % ", ".join(TarFileHandler.compressionMethods))
+                        help="Set compression method, only in combination with --tar. "
+                             "Can be one of %s" % ", ".join(TarFileHandler.compressionMethods))
     parser.add_argument('-4', '--ipv4-only', action="store_true", default=False,
                         help="Listen on IPv4 only")
     parser.add_argument('-6', '--ipv6-only', action="store_true", default=False,
@@ -1190,7 +1196,8 @@ def main():
     if args.auth:
         dpos = args.auth.find(":")
         if dpos <= 0 or dpos == (len(args.auth)-1):
-            print("Error: User and password for HTTP basic authentication need to be both at least one character and have to be separated by a \":\".")
+            print("Error: User and password for HTTP basic authentication need to be both "
+                  "at least one character and have to be separated by a \":\".")
             sys.exit(1)
 
     if args.realm and not args.auth:
