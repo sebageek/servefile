@@ -15,6 +15,7 @@ Unreleased
 	  that should have been quoted
 	* fixed broken special char handling in directory listing for python2
 	* drop python3.5 support
+	* fixed PUT uploads with python3 and documented PUT-uploads with curl
 
 
 2020-10-30 v0.5.1
