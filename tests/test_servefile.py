@@ -92,10 +92,13 @@ def datadir(tmp_path):
 
 
 def make_request(path='/', host='localhost', port=SERVEFILE_DEFAULT_PORT, method='get', protocol='http', timeout=5,
-                 **kwargs):
+                 encoding='utf-8', **kwargs):
     url = '{}://{}:{}{}'.format(protocol, host, port, path)
     print('Calling {} on {} with {}'.format(method, url, kwargs))
     r = getattr(requests, method)(url, **kwargs)
+
+    if r.encoding is None and encoding:
+        r.encoding = encoding
 
     return r
 
