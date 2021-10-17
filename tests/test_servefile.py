@@ -9,6 +9,7 @@ import sys
 import tarfile
 import time
 import urllib3
+from requests.exceptions import ConnectionError
 
 # crudly written to learn more about pytest and to have a base for refactoring
 
@@ -58,7 +59,6 @@ def run_servefile():
 
         print("running {} with args {}".format(", ".join(servefile_path), args))
         p = subprocess.Popen([sys.executable] + servefile_path + args, **kwargs)
-        time.sleep(kwargs.get('timeout', 0.3))
         instances.append(p)
 
         return p
@@ -117,6 +117,22 @@ def check_download(expected_data=None, path='/', fname=None, status_code=200, **
     return r  # for additional tests
 
 
+def _retry_while(exception, function, timeout=2):
+    now = time.time  # float seconds since epoch
+
+    def wrapped(*args, **kwargs):
+        timeout_after = now() + timeout
+        while True:
+            try:
+                return function(*args, **kwargs)
+            except exception:
+                if now() >= timeout_after:
+                    raise
+                time.sleep(0.1)
+
+    return wrapped
+
+
 def _test_version(run_servefile, standalone):
     # we expect the version on stdout (python3.4+) or stderr(python2.6-3.3)
     s = run_servefile('--version', standalone=standalone, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -147,7 +163,7 @@ def test_correct_headers(run_servefile, datadir):
     p = datadir({'testfile': data}) / 'testfile'
     run_servefile(str(p))
 
-    r = make_request()
+    r = _retry_while(ConnectionError, make_request)()
     assert r.status_code == 200
     assert r.headers.get('Content-Type') == 'application/octet-stream'
     assert r.headers.get('Content-Disposition') == 'attachment; filename="testfile"'
@@ -160,7 +176,7 @@ def test_redirect_and_download(run_servefile, datadir):
     run_servefile(str(p))
 
     # redirect
-    r = make_request(allow_redirects=False)
+    r = _retry_while(ConnectionError, make_request)(allow_redirects=False)
     assert r.status_code == 302
     assert r.headers.get('Location') == '/testfile'
 
@@ -175,7 +191,7 @@ def test_redirect_and_download_with_umlaut(run_servefile, datadir):
     run_servefile(str(p))
 
     # redirect
-    r = make_request(allow_redirects=False)
+    r = _retry_while(ConnectionError, make_request)(allow_redirects=False)
     assert r.status_code == 302
     assert r.headers.get('Location') == '/{}'.format(quote(filename))
 
@@ -190,7 +206,7 @@ def test_specify_port(run_servefile, datadir):
     p = datadir({'testfile': data}) / 'testfile'
     run_servefile([str(p), '-p', str(SERVEFILE_SECONDARY_PORT)])
 
-    check_download(data, fname='testfile', port=SERVEFILE_SECONDARY_PORT)
+    _retry_while(ConnectionError, check_download)(data, fname='testfile', port=SERVEFILE_SECONDARY_PORT)
 
 
 def test_ipv4_only(run_servefile, datadir):
@@ -198,7 +214,7 @@ def test_ipv4_only(run_servefile, datadir):
     p = datadir({'testfile': data}) / 'testfile'
     run_servefile([str(p), '-4'])
 
-    check_download(data, fname='testfile', host='127.0.0.1')
+    _retry_while(ConnectionError, check_download)(data, fname='testfile', host='127.0.0.1')
 
     sock = socket.socket(socket.AF_INET6)
     with pytest.raises(connrefused_exc):
@@ -211,7 +227,7 @@ def test_big_download(run_servefile, datadir):
     p = datadir({'testfile': data}) / 'testfile'
     run_servefile(str(p))
 
-    check_download(data, fname='testfile')
+    _retry_while(ConnectionError, check_download)(data, fname='testfile')
 
 
 def test_authentication(run_servefile, datadir):
@@ -220,11 +236,11 @@ def test_authentication(run_servefile, datadir):
 
     run_servefile([str(p), '-a', 'user:password'])
     for auth in [('foo', 'bar'), ('user', 'wrong'), ('unknown', 'password')]:
-        r = make_request(auth=auth)
+        r = _retry_while(ConnectionError, make_request)(auth=auth)
         assert '401 - Unauthorized' in r.text
         assert r.status_code == 401
 
-    check_download(data, fname='testfile', auth=('user', 'password'))
+    _retry_while(ConnectionError, check_download)(data, fname='testfile', auth=('user', 'password'))
 
 
 def test_serve_directory(run_servefile, datadir):
@@ -241,12 +257,12 @@ def test_serve_directory(run_servefile, datadir):
     # check if all files are in directory listing
     # (could be made more sophisticated with beautifulsoup)
     for path in '/', '/../':
-        r = make_request(path)
+        r = _retry_while(ConnectionError, make_request)(path)
         for k in d:
             assert quote(k) in r.text
 
     for fname, content in d['foo'].items():
-        check_download(content, '/foo/' + fname)
+        _retry_while(ConnectionError, check_download)(content, '/foo/' + fname)
 
     r = make_request('/unknown')
     assert r.status_code == 404
@@ -268,7 +284,7 @@ def test_serve_relative_directory(run_servefile, datadir):
     # check if all files are in directory listing
     # (could be made more sophisticated with beautifulsoup)
     for path in '/', '/../':
-        r = make_request(path)
+        r = _retry_while(ConnectionError, make_request)(path)
         for k in d:
             assert k in r.text
 
@@ -292,13 +308,13 @@ def test_upload(run_servefile, tmp_path):
 
     run_servefile(['-u', str(uploaddir)])
 
-    # check that servefile created the directory
-    assert uploaddir.is_dir()
-
     # check upload form present
-    r = make_request()
+    r = _retry_while(ConnectionError, make_request)()
     assert r.status_code == 200
     assert 'multipart/form-data' in r.text
+
+    # check that servefile created the directory
+    assert uploaddir.is_dir()
 
     # upload file
     files = {'file': ('haiku.txt', data)}
@@ -329,7 +345,7 @@ def test_upload_size_limit(run_servefile, tmp_path):
 
     # upload file that is too big
     files = {'file': ('toobig', "x" * 2049)}
-    r = make_request(method='post', files=files)
+    r = _retry_while(ConnectionError, make_request)(method='post', files=files)
     assert 'Your file was too big' in r.text
     assert r.status_code == 413
     assert not (uploaddir / 'toobig').exists()
@@ -354,7 +370,7 @@ def test_tar_mode(run_servefile, datadir):
     # test redirect?
 
     # test contents of tar file
-    r = make_request()
+    r = _retry_while(ConnectionError, make_request)()
     assert r.status_code == 200
     tar = tarfile.open(fileobj=io.BytesIO(r.content))
     assert len(tar.getmembers()) == 3
@@ -370,7 +386,7 @@ def test_tar_compression(run_servefile, datadir):
     p = datadir(d)
     run_servefile(['-c', 'gzip', '-t', str(p / 'foo')])
 
-    r = make_request()
+    r = _retry_while(ConnectionError, make_request)()
     assert r.status_code == 200
     tar = tarfile.open(fileobj=io.BytesIO(r.content), mode='r:gz')
     assert len(tar.getmembers()) == 1
@@ -380,7 +396,6 @@ def test_https(run_servefile, datadir):
     data = "NOOT NOOT"
     p = datadir({'testfile': data}) / 'testfile'
     run_servefile(['--ssl', str(p)])
-    time.sleep(0.2)  # time for generating ssl certificates
 
     # fingerprint = None
     # while not fingerprint:
@@ -395,7 +410,7 @@ def test_https(run_servefile, datadir):
 
     # assert fingerprint
     urllib3.disable_warnings()
-    check_download(data, protocol='https', verify=False)
+    _retry_while(ConnectionError, check_download)(data, protocol='https', verify=False)
 
 
 def test_https_big_download(run_servefile, datadir):
@@ -403,10 +418,9 @@ def test_https_big_download(run_servefile, datadir):
     data = "x" * (10 * 1024 ** 2)
     p = datadir({'testfile': data}) / 'testfile'
     run_servefile(['--ssl', str(p)])
-    time.sleep(0.2)  # time for generating ssl certificates
 
     urllib3.disable_warnings()
-    check_download(data, protocol='https', verify=False)
+    _retry_while(ConnectionError, check_download)(data, protocol='https', verify=False)
 
 
 def test_abort_download(run_servefile, datadir):
@@ -419,7 +433,7 @@ def test_abort_download(run_servefile, datadir):
     # provoke a connection abort
     # hopefully the buffers will not fill up with all of the 10mb
     sock = socket.socket(socket.AF_INET)
-    sock.connect(("localhost", SERVEFILE_DEFAULT_PORT))
+    _retry_while(connrefused_exc, sock.connect)(("localhost", SERVEFILE_DEFAULT_PORT))
     sock.send(b"GET /testfile HTTP/1.0\n\n")
     resp = sock.recv(100)
     assert resp != b''
