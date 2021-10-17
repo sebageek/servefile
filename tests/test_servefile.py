@@ -91,7 +91,7 @@ def datadir(tmp_path):
     return _datadir
 
 
-def make_request(path='/', host='localhost', port=SERVEFILE_DEFAULT_PORT, method='get', protocol='http', timeout=5,
+def make_request(path='/', host='localhost', port=SERVEFILE_DEFAULT_PORT, method='get', protocol='http',
                  encoding='utf-8', **kwargs):
     url = '{}://{}:{}{}'.format(protocol, host, port, path)
     print('Calling {} on {} with {}'.format(method, url, kwargs))
@@ -103,7 +103,7 @@ def make_request(path='/', host='localhost', port=SERVEFILE_DEFAULT_PORT, method
     return r
 
 
-def check_download(expected_data=None, path='/', fname=None, status_code=200, **kwargs):
+def check_download(expected_data=None, path='/', fname=None, **kwargs):
     if fname is None:
         fname = os.path.basename(path)
     r = make_request(path, **kwargs)
