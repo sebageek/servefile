@@ -108,7 +108,7 @@ class FileBaseHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                     except ValueError:
                         return (False, None)
 
-                    if fromto[0] >= fileLength or fromto[0] < 0 or fromto[1] >= fileLength or fromto[1]-fromto[0] < 0:
+                    if fromto[0] >= fileLength or fromto[0] < 0 or fromto[1] >= fileLength or fromto[1] - fromto[0] < 0:
                         # oops, already done! (requested range out of range)
                         self.send_response(416)
                         self.send_header('Content-Range', 'bytes */%d' % fileLength)
@@ -164,8 +164,8 @@ class FileBaseHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         return True
 
     def getChunk(self, myfile, fromto):
-        if fromto and myfile.tell()+self.blockSize >= fromto[1]:
-            readsize = fromto[1]-myfile.tell()+1
+        if fromto and myfile.tell() + self.blockSize >= fromto[1]:
+            readsize = fromto[1] - myfile.tell() + 1
         else:
             readsize = self.blockSize
         return myfile.read(readsize)
@@ -913,7 +913,7 @@ class ServeFile():
         # with the same serial ==> we just use the seconds as serial.
         cert.set_serial_number(int(time.time()))
         cert.gmtime_adj_notBefore(0)
-        cert.gmtime_adj_notAfter(365*24*60*60)
+        cert.gmtime_adj_notAfter(365 * 24 * 60 * 60)
         cert.set_issuer(req.get_subject())
         cert.set_subject(req.get_subject())
         cert.add_extensions([ext])
@@ -1195,7 +1195,7 @@ def main():
 
     if args.auth:
         dpos = args.auth.find(":")
-        if dpos <= 0 or dpos == (len(args.auth)-1):
+        if dpos <= 0 or dpos == (len(args.auth) - 1):
             print("Error: User and password for HTTP basic authentication need to be both "
                   "at least one character and have to be separated by a \":\".")
             sys.exit(1)
