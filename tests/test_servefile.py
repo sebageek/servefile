@@ -357,6 +357,20 @@ def test_upload_size_limit(run_servefile, tmp_path):
     assert r.status_code == 200
 
 
+def test_upload_large_file(run_servefile, tmp_path):
+    # small files end up in BytesIO while large files get temporary files. this
+    # test makes sure we hit the large file codepath at least once
+    uploaddir = tmp_path / 'upload'
+    run_servefile(['-u', str(uploaddir)])
+
+    data = "asdf" * 1024
+    files = {'file': ('more_data.txt', data)}
+    r = _retry_while(ConnectionError, make_request)(method='post', files=files)
+    assert r.status_code == 200
+    with open(str(uploaddir / 'more_data.txt')) as f:
+        assert f.read() == data
+
+
 def test_tar_mode(run_servefile, datadir):
     d = {
         'foo': {

@@ -21,6 +21,7 @@ import select
 import socket
 from subprocess import Popen, PIPE
 import sys
+import tempfile
 import time
 
 # fix imports for python2/python3
@@ -611,7 +612,24 @@ class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
         # create FieldStorage object for multipart parsing
         env = os.environ
         env['REQUEST_METHOD'] = "POST"
-        fstorage = cgi.FieldStorage(fp=self.rfile, headers=self.headers, environ=env)
+        targetDir = self.targetDir
+
+        class CustomFieldStorage(cgi.FieldStorage):
+
+            def make_file(self, *args, **kwargs):
+                """Overwritten to use a named file and the upload directory
+
+                Python 2.7 has an unused "binary" argument while Python 3 does
+                not have any arguments. Python 2.7 does not have a
+                self._binary_file attribute.
+                """
+                if sys.version_info.major == 2 or self._binary_file:
+                    return tempfile.NamedTemporaryFile("wb+", dir=targetDir)
+                else:
+                    return tempfile.NamedTemporaryFile(
+                        "w+", encoding=self.encoding, newline='\n', dir=targetDir)
+
+        fstorage = CustomFieldStorage(fp=self.rfile, headers=self.headers, environ=env)
         if "file" not in fstorage:
             self.sendResponse(400, "No file found in request.")
             return
@@ -621,14 +639,21 @@ class FilePutter(BaseHTTPServer.BaseHTTPRequestHandler):
             self.sendResponse(400, "Filename was empty or invalid")
             return
 
-        # write file down to disk, send a 200 afterwards
-        target = open(destFileName, "wb")
-        bytesLeft = length
-        while bytesLeft > 0:
-            bytesToRead = min(self.blockSize, bytesLeft)
-            target.write(fstorage["file"].file.read(bytesToRead))
-            bytesLeft -= bytesToRead
-        target.close()
+        # put the file at the right place, send 200 afterwards
+        if getattr(fstorage["file"].file, "name", None):
+            # the sent file was large, so we can just hard link the temporary
+            # file and are done
+            os.link(fstorage["file"].file.name, destFileName)
+        else:
+            # write file to disk. it was small enough so no temporary file was
+            # created
+            target = open(destFileName, "wb")
+            bytesLeft = length
+            while bytesLeft > 0:
+                bytesToRead = min(self.blockSize, bytesLeft)
+                target.write(fstorage["file"].file.read(bytesToRead))
+                bytesLeft -= bytesToRead
+            target.close()
         self.sendResponse(200, "OK! Thanks for uploading")
         print("Received file '%s' from %s." % (destFileName, self.client_address[0]))
 
