@@ -527,10 +527,7 @@ class DirListingHandler(FileBaseHandler):
             target_items.append((item, itemPath, stat))
 
         # Directories first, then files
-        for (tuple_list, is_dir) in (
-                (dir_items, True),
-                (file_items, False),
-                ):
+        for (tuple_list, is_dir) in ((dir_items, True), (file_items, False)):
             for (item, itemPath, stat) in tuple_list:
                 self._appendToListing(content, item, itemPath, stat, is_dir=is_dir)
 
@@ -874,7 +871,7 @@ class ServeFile():
             if oldLang:
                 os.environ['LC_ALL'] = oldLang
             else:
-                del(os.environ['LC_ALL'])
+                del os.environ['LC_ALL']
             if proc.wait() != 0:
                 # we couldn't find any ip address
                 proc = None
