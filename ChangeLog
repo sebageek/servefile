@@ -1,6 +1,17 @@
 servefile changelog
 ===================
 
+2023-01-23 v0.5.4
+-----------------
+
+	0.5.4 released
+
+	* code reformatting for better maintainability
+	* upload to uploaddir instead of /tmp for large files
+	* add python3.10 / python3.11 support
+	* drop python3.6 support
+
+
 2021-11-18 v0.5.3
 -----------------
 

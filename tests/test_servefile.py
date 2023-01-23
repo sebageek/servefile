@@ -146,7 +146,7 @@ def _test_version(run_servefile, standalone):
         version = s.stdout.readline().decode().strip()
 
     # hardcode version as string until servefile is a module
-    assert version == 'servefile 0.5.3'
+    assert version == 'servefile 0.5.4'
 
 
 def test_version(run_servefile):
