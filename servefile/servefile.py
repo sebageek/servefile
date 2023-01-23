@@ -11,7 +11,6 @@ __version__ = '0.5.3'
 
 import argparse
 import base64
-import cgi
 import datetime
 import io
 import mimetypes
@@ -23,6 +22,7 @@ from subprocess import Popen, PIPE
 import sys
 import tempfile
 import time
+import warnings
 
 # fix imports for python2/python3
 try:
@@ -42,6 +42,11 @@ try:
     HAVE_SSL = True
 except ImportError:
     pass
+
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore", category=DeprecationWarning)
+    # scheduled for removal in python3.13, used for FieldStorage
+    import cgi
 
 
 def getDateStrNow():
