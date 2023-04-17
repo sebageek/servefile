@@ -14,9 +14,9 @@ jobs:
         python: [2.7, 3.7, 3.8, 3.9, "3.10", 3.11]
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab  # v3.5.2
       - name: Setup Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@d27e3f3d7c64b4bbf8e4abfb9b63b83e846e0435  # v4.5.0
         with:
           python-version: ${{ matrix.python }}
       - name: Install Tox
@@ -26,9 +26,9 @@ jobs:
   pep8:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab  # v3.5.2
       - name: Setup python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@d27e3f3d7c64b4bbf8e4abfb9b63b83e846e0435  # v4.5.0
         with:
           python-version: 3.9
       - name: Install Tox
